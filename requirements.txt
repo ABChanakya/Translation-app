@@ -1,0 +1,7 @@
+# requirements.txt
+torch>=2.3.0
+ultralytics>=8.0.0
+manga-ocr>=0.1.14
+opencv-python>=4.7.0
+Pillow>=9.0.0
+requests>=2.25.0

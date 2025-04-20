@@ -1,0 +1,26 @@
+##############################################################################
+#  💡  PROJECT‑SPECIFIC IGNORE RULES
+##############################################################################
+
+# ─── Big / external folders ────────────────────────────────────────────────
+jameslahm/
+manga-env/
+manga-ocr-master/
+Manga109Dialog_Workspace/
+yolov10/
+manga-ocr-master.zip
+
+
+# ─── One‑off helper / housekeeping scripts (not needed in repo) ───────────
+keep_ignore_report.json
+llama.py
+rename_seq.py
+dedupe.py
+repo_clean.py
+setup_manga109dialog.py
+tree.json
+
+# ─── Model checkpoints ─────────────────────────────────────────────────────
+yolo11n.pt
+yolov8n.pt           # adjust name if different
+

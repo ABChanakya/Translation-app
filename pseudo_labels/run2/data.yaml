@@ -1,0 +1,10 @@
+nc: 3
+train: images
+val: images
+names:
+  0: bubble
+
+names:
+  0: Dialogue
+  1: Sound Effects
+  2: Signs/labels
