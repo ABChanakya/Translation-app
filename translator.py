@@ -13,7 +13,7 @@ Translate every image under ``data/needs`` and write the results next to them::
 
     python translator.py \
         --input data/needs \
-        --model yolo_train_run/augmented/weights/best.pt \
+        --model yolo_train_run/full_finetune/weights/best.pt\
         --lang en \
         --output translated_pages
 
@@ -35,7 +35,7 @@ import cv2
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from manga_ocr import MangaOcr
-from googletrans import Translator  # swap to your preferred service if you like
+from deep_translator import GoogleTranslator
 from tqdm import tqdm
 from ultralytics import YOLO
 
@@ -96,15 +96,18 @@ def ocr_bubbles(crops: List[Crop], ocr_engine: MangaOcr) -> List[str]:
 # 4. Translation                                                               #
 ################################################################################
 def translate_texts(texts: List[str], target_lang: str = "en") -> List[str]:
-    translator = Translator()
-    translations = []
+    """
+    Translate a list of strings into `target_lang` using deep-translator.
+    Falls back to the original text if an exception occurs.
+    """
+    translations: List[str] = []
     for t in texts:
         try:
-            translated = translator.translate(t, dest=target_lang)
-            translations.append(translated.text)
+            translated = GoogleTranslator(source='auto', target=target_lang).translate(t)
+            translations.append(translated)
         except Exception as e:
             logging.warning(f"Translation failed for: '{t}' – {e}")
-            translations.append(t)  # fallback to original or ""
+            translations.append(t)
     return translations
 
 ################################################################################
@@ -112,6 +115,9 @@ def translate_texts(texts: List[str], target_lang: str = "en") -> List[str]:
 ################################################################################
 
 def overlay_translations(page_img: np.ndarray, crops: List[Crop], translations: List[str]) -> np.ndarray:
+    # ——— sanitize translations so we never have None ———
+    translations = [t if isinstance(t, str) else "" for t in translations]
+
     pil_base = Image.fromarray(cv2.cvtColor(page_img, cv2.COLOR_BGR2RGB)).convert("RGBA")
     txt_layer = Image.new("RGBA", pil_base.size, (255, 255, 255, 0))
     draw = ImageDraw.Draw(txt_layer)
@@ -125,16 +131,19 @@ def overlay_translations(page_img: np.ndarray, crops: List[Crop], translations: 
                 bbox = draw.textbbox((0, 0), text, font=font)
             return bbox[2] - bbox[0], bbox[3] - bbox[1]
         except AttributeError:
+            # fallback for older Pillow
             if multiline:
                 return draw.multiline_textsize(text, font=font, spacing=spacing)
             else:
                 return draw.textsize(text, font=font)
 
     for (_, (x1, y1, x2, y2)), text in zip(crops, translations):
-        t = text.strip()
+        # guard against None or blank strings
+        t = (text or "").strip()
         if not t:
             continue
-        # word-wrap
+
+        # word‑wrap logic unchanged
         max_w = max(10, x2 - x1 - 10)
         words = t.split()
         lines: List[str] = []
@@ -150,16 +159,18 @@ def overlay_translations(page_img: np.ndarray, crops: List[Crop], translations: 
         lines.append(curr)
         final_text = "\n".join(lines)
 
+        # center the box
         w, h = get_text_size(final_text, multiline=True, spacing=2)
         tx = x1 + max(0, ((x2 - x1) - w) // 2)
         ty = y1 + max(0, ((y2 - y1) - h) // 2)
 
         draw.rectangle([tx - 2, ty - 2, tx + w + 2, ty + h + 2], fill=(255, 255, 255, 200))
-        draw.multiline_text((tx, ty), final_text, fill=(0, 0, 255, 255), font=font, spacing=2, align="center")
-
+        draw.multiline_text((tx, ty), final_text, fill=(0, 0, 255, 255),
+                            font=font, spacing=2, align="center")
 
     combined = Image.alpha_composite(pil_base, txt_layer).convert("RGB")
     return cv2.cvtColor(np.array(combined), cv2.COLOR_RGB2BGR)
+
 
 ################################################################################
 # Utility                                                                      #
