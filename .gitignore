@@ -13,6 +13,8 @@ manga-ocr-master.zip
 
 # ─── One‑off helper / housekeeping scripts (not needed in repo) ───────────
 keep_ignore_report.json
+import_ls.json
+import_ls_rel.json
 llama.py
 rename_seq.py
 dedupe.py

@@ -1,10 +1,7 @@
-# config.yaml
 nc: 3
-
-train: "/home/chanakya/chanakya/UNI/translation tool/data/images/train"
-val:   "/home/chanakya/chanakya/UNI/translation tool/data/images/val"
-
+train: "/home/chanakya/chanakya/UNI/translation_tool/data/images/train"
+val:   "/home/chanakya/chanakya/UNI/translation_tool/data/images/val"
 names:
   0: Dialogue
-  1: Sound Effects
-  2: Signs/labels
+  1: Sound_Effects
+  2: Signs_Labels

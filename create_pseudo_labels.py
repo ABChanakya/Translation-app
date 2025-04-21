@@ -1,28 +1,20 @@
 #!/usr/bin/env python3
 """
-create_pseudo_labels.py
+create_pseudo_labels.py (fixed)
 
 Generate pseudo-labels (YOLO-format bounding boxes) and visualizations for unlabeled images using a pretrained Ultralytics YOLO model.
 
-Features:
-1. Configurable via CLI arguments
-2. Uses Ultralytics YOLOv8 API for inference
-3. Saves annotations in YOLO txt format: <class> <x_center> <y_center> <width> <height>
-4. Optionally draws bounding boxes with class labels/confidences on images
-5. Supports recursive image discovery and custom class names
-6. Organizes label files into a "labels" subfolder and visualizations into output directory
-7. Robust error handling and logging
+Added handling for truncated image files by enabling PIL's LOAD_TRUNCATED_IMAGES and catching image-loading errors.
 
 Usage:
     python create_pseudo_labels.py \
         --input data/needs \
-        --output pseudo_labels/run2 \
-        --model yolo_train_run/augmented/weights/best.pt \
+        --output pseudo_labels/run3 \
+        --model yolo_train_run/full_finetune/weights/best.pt \
         --conf 0.25 \
         --batch-size 16 \
         --names classes.txt \
         --vis-thickness 2
-
 """
 import os
 import sys
@@ -31,7 +23,10 @@ import logging
 from pathlib import Path
 import glob
 from ultralytics import YOLO
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageFile
+
+# Allow loading of truncated images
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 # --------------------------- Logging ---------------------------
 def setup_logging():
@@ -75,7 +70,7 @@ def load_names(names_path):
     if not names_path or not os.path.isfile(names_path):
         return None
     with open(names_path, 'r') as f:
-        return [line.strip() for line in f.readlines()]
+        return [line.strip() for line in f]
 
 
 def save_annotations(txt_path, boxes):
@@ -86,8 +81,11 @@ def save_annotations(txt_path, boxes):
 
 
 def draw_boxes(image_path, boxes, vis_path, names=None, thickness=2):
-    """Draw bounding boxes and labels on image and save to vis_path."""
-    img = Image.open(image_path).convert("RGB")
+    try:
+        img = Image.open(image_path).convert("RGB")
+    except OSError as e:
+        logging.warning(f"Skipping visualization for '{image_path}': {e}")
+        return
     draw = ImageDraw.Draw(img)
     try:
         font = ImageFont.truetype("arial.ttf", size=14)
@@ -123,7 +121,6 @@ def main():
 
     out_dir = Path(args.output)
     out_dir.mkdir(parents=True, exist_ok=True)
-    # Create labels subfolder
     label_dir = out_dir / 'labels'
     label_dir.mkdir(parents=True, exist_ok=True)
 
@@ -172,11 +169,9 @@ def main():
             boxes_norm.append((cls, x_center, y_center, width, height))
             boxes_vis.append((cls, x1, y1, x2, y2, conf))
 
-        # Save annotation txt in labels subfolder
         txt_path = label_dir / f"{img_path.stem}.txt"
         save_annotations(str(txt_path), boxes_norm)
 
-        # Save visualization image
         vis_path = out_dir / f"{img_path.stem}.jpg"
         if boxes_vis:
             draw_boxes(str(img_path), boxes_vis, str(vis_path), names, args.vis_thickness)
