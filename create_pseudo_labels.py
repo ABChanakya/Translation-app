@@ -9,7 +9,7 @@ Added handling for truncated image files by enabling PIL's LOAD_TRUNCATED_IMAGES
 Usage:
     python create_pseudo_labels.py \
         --input data/needs \
-        --output pseudo_labels/run3 \
+        --output pseudo_labels/run4 \
         --model yolo_train_run/full_finetune/weights/best.pt \
         --conf 0.25 \
         --batch-size 16 \
