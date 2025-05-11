@@ -9,6 +9,11 @@ manga-ocr-master/
 Manga109Dialog_Workspace/
 yolov10/
 manga-ocr-master.zip
+data1/
+pseudo_labels/
+.venv/
+translated_pages/
+yolov10/
 
 
 # ─── One‑off helper / housekeeping scripts (not needed in repo) ───────────
@@ -21,8 +26,19 @@ dedupe.py
 repo_clean.py
 setup_manga109dialog.py
 tree.json
+deleter.py
+DEMO.py
+evaluate_thresholds.py
+mv 02.ini
+nvidia_gpu_monitor.py
+rawkuma_scraper.py
+theshold_sweep_results.json
+
+
+
 
 # ─── Model checkpoints ─────────────────────────────────────────────────────
 yolo11n.pt
 yolov8n.pt           # adjust name if different
+yolov8m.pt
 

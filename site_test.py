@@ -1,0 +1,668 @@
+"""
+website.py – Self‑contained dual‑front‑end (Streamlit / Gradio) manga‑page translator.
+
+Installation (once):
+    pip install streamlit gradio ultralytics manga-ocr pillow numpy opencv-python \
+        argostranslate==1.8.0 transformers==4.* sentencepiece torch
+
+Run Streamlit (default):
+    streamlit run website.py
+
+Run Gradio:
+    WEB_UI=gradio python website.py
+"""
+
+
+from __future__ import annotations
+
+import os
+import io
+import math
+import json
+import time
+import shutil
+import tempfile
+from functools import lru_cache
+from typing import Dict, List, Tuple, Optional, Any
+import textwrap
+
+import numpy as np
+import cv2
+from PIL import Image, ImageDraw, ImageFont, ImageColor
+
+
+import torch
+from ultralytics import YOLO
+import torchvision.ops as ops
+from manga_ocr import MangaOcr
+
+# UI libs (always import; both are installed via requirements)
+import streamlit as st
+
+
+from transformers import (
+    AutoTokenizer,
+    AutoModelForSeq2SeqLM,
+    MarianTokenizer,
+    MarianMTModel,
+)
+
+import argostranslate.package
+import argostranslate.translate
+# Add these imports at the top of your file:
+try:
+    from googletrans import Translator as GoogleTranslator
+except (ImportError, AttributeError):
+    GoogleTranslator = None
+    # and later in your translate() function:
+    # if engine=="Google" and GoogleTranslator is None: fall back to another engine
+# ─── googletrans helper ────────────────────────────────────────────────────────
+if GoogleTranslator is not None:
+    _GT = GoogleTranslator()          # one reusable client
+else:
+    _GT = None                        # will trigger fallback later
+
+
+import deepl
+from azure.ai.translation.text import TextTranslationClient
+from azure.core.credentials import AzureKeyCredential
+import requests
+
+
+
+
+# ---------------------------------- CONFIG ---------------------------------- #
+YOLO_MODEL_PATH = "yolo_train_run/full_finetune_phase20/weights/best.pt"        # <––– PUT your YOLOv8/9 weights here
+# Example file structure:
+# yolo_train_run/
+# ├── full_finetune_phase20/
+# │   ├── weights/
+# │   │   ├── best.pt
+# For more details, refer to the YOLOv8/YOLOv9 documentation: https://docs.ultralytics.com/
+CACHE_DIR = os.path.join(tempfile.gettempdir(), "manga_translator_cache")
+os.makedirs(CACHE_DIR, exist_ok=True)
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+MAX_SIDE = 1600          # shrink page to <=1600 px on longest side
+
+# Translation model IDs
+MARIAN_PREFIX = "Helsinki-NLP/opus-mt"
+NLLB_ID = "facebook/nllb-200-distilled-600M"
+DEEPL_API_KEY        = os.getenv("DEEPL_API_KEY", "")
+AZURE_TRANSLATOR_KEY = os.getenv("AZURE_TRANSLATOR_KEY", "")
+AZURE_ENDPOINT       = os.getenv("AZURE_ENDPOINT", "")
+# Define default font path for text rendering.
+FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+
+# Define detection classes
+# SFX = 0
+# SIGN = 1
+# TEXT = 2
+# REMOVAL = 3
+# DIALOGUE = 4
+DIALOGUE = 0
+SOUND_EFFECTS = 1
+SIGNS = 2
+TEXT = 3
+REMOVAL = 4
+# Class IDs
+@st.cache_resource(ttl=86400)
+def get_yolo_model(conf: float = .25, iou: float = .45):
+    model = YOLO(YOLO_MODEL_PATH)   # 1. load
+    model.fuse()                    # 2. fuse ‑ in‑place, ignore return
+    if DEVICE == "cuda":
+        model.to("cuda").half()     # 3. move / cast
+    model.predict(conf=conf, iou=iou)   # 4. warm‑up
+    return model
+
+# ---------------------------------------------------------------------------- #
+# ---------- 1. keep ONE get_yolo_model ------------------------------------
+@st.cache_resource(ttl=86400, show_spinner=False)
+def get_yolo_model(conf: float = .25, iou: float = .45):
+    model = YOLO(YOLO_MODEL_PATH)   # 1️⃣ create model
+    model.fuse()                    # 2️⃣ optimise layers in‑place
+    if DEVICE == "cuda":
+        model.to("cuda").half()     # 3️⃣ move & cast
+    model.predict(conf=conf, iou=iou)   # 4️⃣ warm‑up
+    return model                    # 5️⃣ return the real object
+
+
+@st.cache_resource(show_spinner=False, ttl=None)
+def get_ocr():
+    ocr = MangaOcr()
+    if DEVICE == "cuda":
+        ocr.model.to("cuda", dtype=torch.float16)
+    return ocr
+
+
+
+@lru_cache(maxsize=4)
+def _load_marian(src: str, tgt: str):
+    model_name = f"{MARIAN_PREFIX}-{src}-{tgt}"
+    tok = MarianTokenizer.from_pretrained(model_name)
+    mdl = MarianMTModel.from_pretrained(model_name)
+    return tok, mdl
+
+
+@lru_cache(maxsize=2)
+def _load_nllb():
+    tok = AutoTokenizer.from_pretrained(NLLB_ID)
+    mdl = AutoModelForSeq2SeqLM.from_pretrained(NLLB_ID)
+    return tok, mdl
+
+
+def _ensure_argos_pkg(src: str, tgt: str):
+    """Download Argos model pair lazily into cache dir."""
+    installed = {(p.from_code, p.to_code) for p in argostranslate.package.get_installed_packages()}
+    if (src, tgt) in installed:
+        return
+    # tiny network call; if offline will except and fallback
+    pkg_url = f"https://huggingface.co/argosopentech/argos-translate-{src}_{tgt}/resolve/main/{src}_{tgt}.argos"
+    try:
+        fn = os.path.join(CACHE_DIR, f"{src}_{tgt}.argos")
+        if not os.path.exists(fn):
+            r = requests.get(pkg_url, timeout=10)
+            r.raise_for_status()
+            with open(fn, "wb") as f:
+                f.write(r.content)
+        argostranslate.package.install_from_path(fn)
+    except Exception:
+        pass  # fallback later
+
+
+# ---------------------------------------------------------------------------- #
+#                              UTILITY HELPERS                                 #
+# ---------------------------------------------------------------------------- #
+def whitest_pixel(arr: np.ndarray) -> Tuple[int, int, int]:
+    if arr.ndim != 3 or arr.shape[-1] != 3:
+        raise ValueError("Input array must have three color channels (H x W x 3).")
+    idx = np.argmax(arr.sum(axis=-1))
+    h, w, _ = arr.shape
+    y, x = divmod(idx, w)
+    return tuple(map(int, arr[y, x]))
+
+
+def median_color(arr: np.ndarray) -> Tuple[int, int, int]:
+    med = np.median(arr.reshape(-1, 3), axis=0)
+    return tuple(int(x) for x in med)
+
+
+def overlay(
+    pil_img: Image.Image,
+    boxes,            # Iterable[(x1,y1,x2,y2), ...]
+    texts,            # Iterable[str, …]  – already wrapped
+    sizes,            # Iterable[int, …]  – font sizes per text
+    colors            # Iterable[Tuple[int,int,int,int], …]  RGBA
+) -> Image.Image:
+    """
+    Draws *texts* on a transparent layer and composites it on top of *pil_img*.
+
+    Parameters
+    ----------
+    pil_img : PIL.Image
+        Original manga page (RGB or RGBA).
+    boxes : list[tuple[int,int,int,int]]
+        Bounding boxes where each string should be rendered.
+    texts : list[str]
+        Text strings (one per box).
+    sizes : list[int]
+        Font size per string.
+    colors : list[tuple[int,int,int,int]]
+        RGBA text colours, e.g. (0,0,255,255).
+
+    Returns
+    -------
+    PIL.Image
+        The original page with the overlay composited (mode “RGB”).
+    """
+    base   = pil_img.convert("RGBA")
+    layer  = Image.new("RGBA", base.size, (255, 255, 255, 0))
+    draw   = ImageDraw.Draw(layer)
+
+    for (x1, y1, x2, y2), txt, sz, col in zip(boxes, texts, sizes, colors):
+        font = load_font(sz)
+        wbox = draw.textbbox((0, 0), txt, font=font)
+        tw, th = wbox[2] - wbox[0], wbox[3] - wbox[1]
+        cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+        draw.multiline_text(
+            (cx, cy),
+            txt,
+            font=font,
+            fill=col,
+            anchor="mm",
+            align="center",
+        )
+
+    # composite and drop alpha
+    return Image.alpha_composite(base, layer).convert("RGB")
+
+
+def load_font(size:int):
+    try:
+        return ImageFont.truetype(FONT_PATH, size)
+    except OSError:
+        return ImageFont.load_default()
+
+
+
+def fit_and_wrap_text(
+    draw: ImageDraw.Draw,
+    text: str,
+    box: Tuple[int, int, int, int],
+    font_path: str = FONT_PATH,
+    max_size: int = 60,
+    min_size: int = 12,
+    step: int = 2
+) -> Tuple[str, ImageFont.FreeTypeFont]:
+    """
+    Returns a (wrapped_text, font) pair such that:
+      • wrapped_text is broken into lines that never exceed box width
+      • font is the largest size between max_size and min_size that
+        makes the rendered block fit inside box (w × h)
+    """
+    x1, y1, x2, y2 = box
+    box_w, box_h = x2 - x1, y2 - y1
+
+    # Estimate avg char width by measuring “M” once per size
+    for size in range(max_size, min_size - 1, -step):
+        try:
+            font = ImageFont.truetype(font_path, size=size)
+        except OSError:
+            continue  # skip sizes if ttf missing
+        
+        # Compute bounding box for a reference character "M"
+        m_bbox = draw.textbbox((0, 0), "M", font=font)
+        avg_char_w = max(5, m_bbox[2] - m_bbox[0])  # Ensure a minimum threshold for avg_char_w
+        max_chars = max(1, box_w // avg_char_w)     # Avoid unexpected behavior
+        # Optionally recompute avg_char_w and max_chars (if needed)
+        avg_char_w = max(1, m_bbox[2] - m_bbox[0])
+        max_chars = box_w // avg_char_w or 1
+        
+        # Wrap by words using textwrap
+        wrapped = "\n".join(textwrap.wrap(text, width=max_chars))
+        
+        # Measure the whole block
+        tb = draw.multiline_textbbox((0, 0), wrapped, font=font)
+        text_w, text_h = tb[2] - tb[0], tb[3] - tb[1]
+        
+        if text_w <= box_w and text_h <= box_h:
+            return wrapped, font
+
+    # Fallback: use the smallest size
+    font = ImageFont.truetype(font_path, size=min_size)
+    m_bbox = draw.textbbox((0, 0), "M", font=font)
+    avg_char_w = max(1, m_bbox[2] - m_bbox[0])
+    wrapped = "\n".join(textwrap.wrap(text, width=box_w // avg_char_w or 1))
+    return wrapped, font
+
+
+# ---------------------------------------------------------------------------- #
+#                           TRANSLATION ABSTRACTION                            #
+# ---------------------------------------------------------------------------- #
+def translate(text: str, src: str, tgt: str, engine: str) -> str:
+    """
+    Translate *text* from *src* → *tgt* using the chosen *engine*.
+    If that engine fails, fall back to Argos → Google in that order.
+    If Google also fails, return the original text unchanged.
+    """
+    text = text.strip()
+    if not text:
+        return ""
+
+    try:
+        # ── Google Translate (unofficial) ────────────────────────────────
+        if engine == "Google":
+            if _GT is None:                           # library missing
+                # Check if Argos is installed before falling back
+                if not argostranslate.package.get_installed_packages():
+                    raise RuntimeError("Argos Translate is not installed. Please install it to use as a fallback.")
+                return translate(text, src, tgt, "Argos")
+
+            try:
+                return _GT.translate(text, src=src or "auto", dest=tgt).text
+            except Exception:
+                return translate(text, src, tgt, "Argos")
+
+        # ── DeepL ────────────────────────────────────────────────────────
+        elif engine == "DeepL":
+            translator = deepl.Translator(DEEPL_API_KEY)
+            resp = translator.translate_text(
+                text, source_lang=src.upper(), target_lang=tgt.upper()
+            )
+            return resp.text
+
+        # ── Azure Translator ─────────────────────────────────────────────
+        elif engine == "Azure":
+            cred   = AzureKeyCredential(AZURE_TRANSLATOR_KEY)
+            client = TextTranslationClient(endpoint=AZURE_ENDPOINT, credential=cred)
+            result = client.translate(content=[text], from_parameter=src, to=[tgt])
+            return result[0].translations[0].text
+
+        # ── Argos (offline) ──────────────────────────────────────────────
+        elif engine == "Argos":
+            _ensure_argos_pkg(src, tgt)
+            return argostranslate.translate.translate(text, src, tgt)
+
+        # ── MarianMT (Helsinki) ──────────────────────────────────────────
+        elif engine == "MarianMT":
+            tok, mdl = _load_marian(src, tgt)
+            out = mdl.generate(**tok(text, return_tensors="pt"), max_length=256)
+            return tok.decode(out[0], skip_special_tokens=True)
+
+        # ── NLLB (Meta) ──────────────────────────────────────────────────
+        elif engine == "NLLB":
+            tok, mdl = _load_nllb()
+            if src not in tok.lang_code_to_id:
+                raise ValueError(f"Unsupported src lang {src!r} for NLLB")
+            inp = tok(text, return_tensors="pt")
+            inp["forced_bos_token_id"] = tok.lang_code_to_id.get(tgt, 0)
+            out = mdl.generate(**inp, max_length=256)
+            return tok.decode(out[0], skip_special_tokens=True)
+
+        # ── Unknown engine name ──────────────────────────────────────────
+        else:
+            raise ValueError(f"Unknown translation engine: {engine!r}")
+
+    # ── If the chosen engine blew up, fall back hierarchically ──────────
+    except Exception:
+        if engine not in ("Google", "Argos"):
+            return translate(text, src, tgt, "Argos")
+        if engine != "Google":
+            return translate(text, src, tgt, "Google")
+        return text  # All fallbacks failed
+
+
+# ---------------------------------------------------------------------------- #
+#                          PROCESSING                                          #
+# ---------------------------------------------------------------------------- #
+# def group_boxes_by_class(result, conf_thresh=.25, iou_thresh=.45):
+    groups = {int(k): [] for k in range(len(result.names))}
+
+    # collect boxes
+    for box, cls, conf in zip(result.boxes.xyxy.cpu(),
+                              result.boxes.cls.int().cpu(),
+                              result.boxes.conf.cpu()):
+        if conf < conf_thresh:
+            continue
+        groups[int(cls)].append((tuple(map(float, box)), float(conf)))
+
+    if iou_thresh:
+        for cls, items in groups.items():
+            if not items:
+                continue
+            # → float32 on the SAME device as torchvision
+            device = "cuda" if DEVICE == "cuda" else "cpu"
+            b = torch.tensor([bb for bb, _ in items],
+                             dtype=torch.float32, device=device)
+            s = torch.tensor([ss for _, ss in items],
+                             dtype=torch.float32, device=device)
+
+            keep = ops.nms(b, s, iou_thresh).tolist()
+            groups[cls] = [items[i] for i in keep]
+
+    return groups
+
+def group_boxes_by_class(result,
+                          conf_thresh: float = 0.25,
+                          iou_thresh: float = 0.45) -> Dict[int, List[Tuple]]:
+    """Return {class_id: [(x1,y1,x2,y2), score]} with **native ints**."""
+    groups = {int(i): [] for i in range(len(result.names))}
+
+    # ➊ filter boxes
+    for box, cls, conf in zip(result.boxes.xyxy.cpu(),
+                              result.boxes.cls.cpu(),
+                              result.boxes.conf.cpu()):
+        if conf < conf_thresh:
+            continue
+        # -> turn each coordinate into a python int via .item()
+        bbox = tuple(int(v.item()) for v in box)
+        groups[int(cls.item())].append((bbox, float(conf.item())))
+
+    # ➋ optional per‑class NMS
+    if iou_thresh:
+        for cid, items in groups.items():
+            if not items:
+                continue
+            b = torch.tensor([bb for bb, _ in items], dtype=torch.float32)
+            s = torch.tensor([sc for _, sc in items])
+            keep = ops.nms(b, s, iou_thresh)
+            groups[cid] = [items[i] for i in keep]
+
+    return groups
+# ---------------------------------------------------------------------------- #
+
+
+
+def find_containing_dialogue(
+    rem_box: Tuple[int, int, int, int],
+    dialogues: List[Tuple[Tuple[int, int, int, int], float]]
+) -> Optional[Tuple[int, int, int, int]]:
+    """
+    Given a removal‐region box and a list of dialogue bubbles (each as (box, confidence)),
+    return the first dialogue‐box that fully contains rem_box, or None if there is none.
+    """
+    rx1, ry1, rx2, ry2 = rem_box
+    for (dx1, dy1, dx2, dy2), _ in dialogues:
+        if rx1 >= dx1 and ry1 >= dy1 and rx2 <= dx2 and ry2 <= dy2:
+            return (dx1, dy1, dx2, dy2)
+    return None
+
+# ---------------------------------------------------------------------------- #
+#                          PROCESSING                                          #
+# ---------------------------------------------------------------------------- #
+def process_page(
+    pil_img: Image.Image,
+    src_lang: str,
+    tgt_lang: str,
+    engine: str,
+    conf: float,
+    iou_thr: float,
+    text_color: str = "#0000FF",
+) -> Tuple[Image.Image, List[Dict[str, Any]]]:
+    """
+    Args
+    ----
+    pil_img : PIL.Image
+        Original manga page.
+    src_lang / tgt_lang : ISO 639‑1 codes (“ja”, “en”, …).
+    engine : Which translation back‑end to use.
+    conf / iou_thr : YOLO score & NMS thresholds.
+    text_color : Hex colour for overlay text.
+
+    Returns
+    -------
+    out_img : PIL.Image
+        Page with cleaned bubbles + translated text.
+    logs : list[dict]
+        Per‑region metadata (class, source text, translation, …).
+    """
+    # ── overlay buffers (collect first, render once at the end) ──────────
+    ov_boxes:  list[tuple[int, int, int, int]] = []
+    ov_texts:  list[str]                       = []
+    ov_sizes:  list[int]                       = []
+    ov_colors: list[tuple[int, int, int, int]] = []
+
+    # ── prep  ────────────────────────────────────────────────────────────
+    model   = get_yolo_model(conf, iou_thr)
+    ocr     = get_ocr()
+    np_img  = np.array(pil_img.convert("RGB"))
+    out_img = pil_img.copy()
+    draw    = ImageDraw.Draw(out_img)
+    logs: list[Dict[str, Any]] = []
+    text_rgb = ImageColor.getrgb(text_color)
+
+    # ── detect & group  ──────────────────────────────────────────────────
+    det    = model.predict(source=np_img, conf=conf, iou=iou_thr, verbose=False)[0]
+    groups = group_boxes_by_class(det, conf_thresh=conf, iou_thresh=iou_thr)
+
+    # ── per‑region processing  ───────────────────────────────────────────
+    for cls in (SOUND_EFFECTS, SIGNS, TEXT, REMOVAL):
+        name = {SOUND_EFFECTS: "SFX", SIGNS: "SIGN", TEXT: "TEXT", REMOVAL: "REMOVAL"}[cls]
+
+        for (x1, y1, x2, y2), _ in groups[cls]:
+            if x2 - x1 < 20 or y2 - y1 < 20:       # skip tiny boxes
+                continue
+
+            # ① crop for OCR (optionally use parent dialogue bubble)
+            if cls == REMOVAL and DIALOGUE in groups:
+                parent = find_containing_dialogue((x1, y1, x2, y2), groups[DIALOGUE])
+                crop_box = parent if parent else (x1, y1, x2, y2)
+            else:
+                crop_box = (x1, y1, x2, y2)
+            sub_img = pil_img.crop(crop_box)
+
+            # ② OCR
+            try:
+                src_text = ocr(sub_img) or ""
+            except Exception:
+                src_text = ""
+
+            # ③ translate
+            tgt_text = translate(src_text, src_lang, tgt_lang, engine) if src_text else ""
+
+            # ④ log
+            logs.append(
+                {
+                    "class": name,
+                    "src_lang": src_lang,
+                    "src_text": src_text,
+                    "tgt_lang": tgt_lang,
+                    "tgt_text": tgt_text,
+                }
+            )
+
+            # ⑤ blank background (white for REMOVAL, median colour otherwise)
+            patch = np_img[y1:y2, x1:x2]
+            fill  = whitest_pixel(patch) if cls == REMOVAL else None
+            draw.rectangle([x1, y1, x2, y2], fill=fill)
+
+            # ⑥ collect overlay info (render later)
+            if tgt_text:
+                wrapped, font = fit_and_wrap_text(draw, tgt_text, (x1, y1, x2, y2))
+                ov_boxes.append((x1, y1, x2, y2))
+                ov_texts.append(wrapped)
+                ov_sizes.append(font.size)
+                ov_colors.append((*text_rgb, 255))
+
+    # ── single overlay render ────────────────────────────────────────────
+    if ov_boxes:
+        out_img = overlay(out_img, ov_boxes, ov_texts, ov_sizes, ov_colors)
+
+    return out_img, logs
+
+
+
+# ---------------------------------------------------------------------------- #
+#                             STREAMLIT FRONT‑END                              #
+# ---------------------------------------------------------------------------- #
+
+
+def build_streamlit() -> None:
+    st.set_page_config("Manga Translator")
+    st.title("📖 Manga Translator (Offline · Open Source)")
+
+    # ── sidebar inputs ───────────────────────────────────────────────────────
+    with st.sidebar:
+        src_lang   = st.text_input("Source language code",  value="ja")
+        tgt_lang   = st.text_input("Target language code",  value="en")
+        engine     = st.selectbox(
+            "Translation engine",
+            ["MarianMT", "Google", "DeepL", "Azure", "Argos", "NLLB"],
+        )
+        conf       = st.slider("YOLO confidence", 0.1, 1.0, 0.25, 0.05)
+        iou_thr    = st.slider("NMS IoU threshold", 0.1, 1.0, 0.45, 0.05)
+        text_color = st.color_picker("Overlay text color", "#0000FF")
+
+    # ── file input ───────────────────────────────────────────────────────────
+    img_file = st.file_uploader("Upload manga page",
+                                type=["png", "jpg", "jpeg"])
+
+    # ‼️ everything that touches the file stays **inside** this guard
+    if img_file:
+        # 1️⃣ preview original
+        st.image(img_file, caption="Original Page",
+                 use_container_width=True)
+
+        # 2️⃣ run the translation pipeline
+        pil_img = Image.open(img_file).convert("RGB")
+        with st.spinner("Detecting & Translating …"):
+            out_img, logs = process_page(
+                pil_img,
+                src_lang=src_lang,
+                tgt_lang=tgt_lang,
+                engine=engine,
+                conf=conf,
+                iou_thr=iou_thr,
+                text_color=text_color,
+            )
+
+        # 3️⃣ show translated page
+        st.image(out_img, caption="Translated",
+                 use_container_width=True)
+
+        # 4️⃣ show per‑bubble logs
+        for log in logs:
+            with st.expander(f"{log['class']}  "
+                             f"({log['src_lang']} → {log['tgt_lang']})"):
+                st.write("Src:", log["src_text"] or "—")
+                st.write("Tgt:", log["tgt_text"] or "—")
+
+    st.caption("All processing is local · models are cached for speed.")
+
+
+# ---------------------------------------------------------------------------- #
+#                               GRADIO FRONT‑END                               #
+# ---------------------------------------------------------------------------- #
+def build_gradio() -> None:
+    import gradio as gr
+    def gr_process(img, src_lang, tgt_lang, engine, conf, iou, text_color):
+        if img is None:
+            return None, "No image"
+        pil_img = Image.fromarray(img).convert("RGB")
+        out_img, logs = process_page(
+            pil_img,
+            src_lang=src_lang,
+            tgt_lang=tgt_lang,
+            engine=engine,
+            conf=conf,
+            iou_thr=iou,
+            text_color=text_color,
+        )
+        return np.array(out_img), json.dumps(logs, ensure_ascii=False, indent=2)
+
+    with gr.Blocks(title="Manga Translator") as demo:
+        gr.Markdown("# 📖 Manga Translator (Offline · Open Source)")
+        with gr.Row():
+            img_in  = gr.Image(type="numpy", label="Input page")
+            img_out = gr.Image(type="numpy", label="Translated")
+        with gr.Row():
+            src_lang   = gr.Textbox(value="ja", label="Source lang code")
+            tgt_lang   = gr.Textbox(value="en", label="Target lang code")
+            engine     = gr.Dropdown(
+                ["Google", "DeepL", "Azure", "Argos", "MarianMT", "NLLB"],
+                value="Google",
+                label="Engine"
+            )
+            conf       = gr.Slider(0.1, 1.0, 0.25, label="YOLO confidence")
+            iou        = gr.Slider(0.1, 1.0, 0.45, label="NMS IoU threshold")
+            text_color = gr.ColorPicker(value="#0000FF", label="Overlay text color")
+        logs_box = gr.Textbox(label="Logs (JSON)")
+
+        gr.Button("Translate").click(
+            gr_process,
+            inputs=[img_in, src_lang, tgt_lang, engine, conf, iou, text_color],
+            outputs=[img_out, logs_box],
+        )
+
+    demo.launch(share=False)
+
+
+# ---------------------------------------------------------------------------- #
+#                                      MAIN                                    #
+# ---------------------------------------------------------------------------- #
+if __name__ == "__main__":
+    ui = os.getenv("WEB_UI", "streamlit")
+    ui = ui.lower() if isinstance(ui, str) else "streamlit"
+    if ui == "gradio":
+        build_gradio()
+    else:
+        build_streamlit()

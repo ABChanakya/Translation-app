@@ -81,7 +81,7 @@ def train_on_dataset(
         translate  = 0.15,
         scale      = 0.6,
         project    = "yolo_train_run",
-        name       = "head_warmup",
+        name       = "head_warmup2",
         exist_ok   = True
     )
 
@@ -107,7 +107,7 @@ def train_on_dataset(
         translate  = 0.15,
         scale      = 0.6,
         project    = "yolo_train_run",
-        name       = "full_finetune_phase1",
+        name       = "full_finetune_phase11",
         exist_ok   = True
     )
 
@@ -132,7 +132,7 @@ def train_on_dataset(
         translate  = 0.1,
         scale      = 0.5,
         project    = "yolo_train_run",
-        name       = "full_finetune_phase2",
+        name       = "full_finetune_phase21 ",
         exist_ok   = True
     )
 
@@ -149,20 +149,22 @@ def infer_with_tight_nms(model: YOLO, source, conf_thr=0.1, iou_thr=0.3, max_det
     return preds
 
 def parse_args():
-    p = argparse.ArgumentParser()
-    p.add_argument("--model",           type=str,   default="yolov8n.pt")
-    p.add_argument("--data",            type=str,   default="config.yaml")
-    p.add_argument("--device",          type=str,   default="cuda")
-    p.add_argument("--head_epochs",     type=int,   default=20)
-    p.add_argument("--full_epochs",     type=int,   default=80)
-    p.add_argument("--no_mosaic_epochs",type=int,   default=15)
-    p.add_argument("--freeze_layers",   type=int,   default=10)
-    p.add_argument("--batch_size",      type=int,   default=24)
-    p.add_argument("--lr_head",         type=float, default=5e-4)
-    p.add_argument("--lr_full",         type=float, default=1e-4)
-    p.add_argument("--patience_head",   type=int,   default=10)
-    p.add_argument("--patience_full",   type=int,   default=15)
-    p.add_argument("--imgsz",           type=int,   default=640)
+    p = argparse.ArgumentParser(description="Multi-phase YOLOv10 training script")
+    p.add_argument("--model",            type=str,   default="yolo_train_run/full_finetune_phase2/weights/best.pt", help="Pretrained model or local checkpoint")
+    p.add_argument("--data",             type=str,   default="config1.yaml",      help="Path to data config YAML")
+    p.add_argument("--device",           type=str,   default="cuda",             help="Device for training (cpu, cuda)")
+    p.add_argument("--head_epochs",      type=int,   default=10,                 help="Epochs to train head (frozen backbone)")
+    p.add_argument("--full_epochs",      type=int,   default=80,                 help="Epochs to fine-tune full model")
+    p.add_argument("--no_mosaic_epochs", type=int,   default=15,                 help="Epochs with mosaic off for final tuning")
+    p.add_argument("--freeze_layers",    type=int,   default=10,                 help="Number of layers to freeze during head training")
+    p.add_argument("--batch_size",       type=int,   default=16,                 help="Batch size")
+    p.add_argument("--lr_head",          type=float, default=5e-4,               help="Learning rate for head training")
+    p.add_argument("--lr_full",          type=float, default=1e-4,               help="Learning rate for full training")
+    p.add_argument("--patience_head",    type=int,   default=10,                 help="Early stopping patience for head training")
+    p.add_argument("--patience_full",    type=int,   default=15,                 help="Early stopping patience for full training")
+    p.add_argument("--imgsz",            type=int,   default=512,                help="Image size")
+    p.add_argument("--mosaic",           type=float, default=0.6,                help="mosaic augmentation prob")
+    p.add_argument("--mixup",            type=float, default=0.3,                help="mixup augmentation prob")
     return p.parse_args()
 
 if __name__ == "__main__":
@@ -185,7 +187,7 @@ if __name__ == "__main__":
     )
 
     # sample inference on your val images
-    sample_imgs = ["data/images/val/147.jpg", "data/images/val/389.jpg"]
+    sample_imgs = ["data/images/val/0126.jpg", "data/images/val/0118.jpg"]
     results = infer_with_tight_nms(model, source=sample_imgs)
     print("\n=== Sample Inference Results ===")
     for det in results:

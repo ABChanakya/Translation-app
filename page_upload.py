@@ -1,216 +1,205 @@
+#!/usr/bin/env python3
+"""
+website_multi.py – Streamlit demo for batch-detecting speech bubbles, OCRing,
+translating, and overlaying the translation on multiple pages.
+
+Dependencies::
+
+    pip install streamlit ultralytics manga-ocr deep-translator pillow opencv-python tqdm
+
+Run with:
+
+    streamlit run website_multi.py
+"""
 import os
 import asyncio
+import glob
+from typing import List, Tuple
 
-# =========================
-# Environment & Async Fixes
-# =========================
-
-# Force Streamlit to use polling instead of its default file watcher
+# -----------------------
+# Disable inotify watchers (avoid ENOSPC errors)
+# -----------------------
 os.environ["STREAMLIT_WATCH_USE_POLLING"] = "true"
+os.environ["STREAMLIT_SERVER_FILE_WATCHER_TYPE"] = "none"
 
-# Ensure an asyncio event loop exists (fixes "no running event loop" errors)
+# -----------------------
+# Async Fix
+# -----------------------
 try:
     asyncio.get_running_loop()
 except RuntimeError:
     asyncio.set_event_loop(asyncio.new_event_loop())
 
-# =========================
-# Import Libraries
-# =========================
-
+# -----------------------
+# Imports
+# -----------------------
 import streamlit as st
-import requests
-import io
 import numpy as np
 from PIL import Image, ImageOps, ImageEnhance, ImageDraw, ImageFont
-
-# PyTorch & YOLO imports for detection
-import cv2
 from ultralytics import YOLO
-from manga_ocr import MangaOcr  # Ensure manga_ocr is installed and set up
+from manga_ocr import MangaOcr
+from deep_translator import GoogleTranslator
 
-# =========================
-# Utility & Stub Functions
-# =========================
+# -----------------------
+# Utility Functions
+# -----------------------
+from typing import List, Tuple
 
-def preprocess_image(img):
-    """
-    Pre-process the image to enhance OCR performance:
-      - Convert to grayscale.
-      - Increase contrast.
-    """
-    img_gray = ImageOps.grayscale(img)
-    enhancer = ImageEnhance.Contrast(img_gray)
-    return enhancer.enhance(1.5)
+def hex_to_rgb(h: str) -> Tuple[int, int, int]:
+    """Convert a hex color string (#RRGGBB) to an RGB tuple."""
+    h = h.lstrip('#')
+    return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
 
-def detect_bubbles(img_pil, yolo_model):
-    """
-    Detect speech bubbles using YOLOv8. Converts the PIL image to OpenCV BGR format,
-    runs detection, and then crops each detected bubble as a separate PIL image.
-    """
-    img_cv2 = np.array(img_pil.convert("RGB"))[:, :, ::-1]  # Convert PIL -> OpenCV BGR
-    results = yolo_model(img_cv2)
-    bubbles = []
-    for box in results[0].boxes.xyxy.cpu().numpy():
-        x1, y1, x2, y2 = map(int, box)
-        bubble_crop = img_pil.crop((x1, y1, x2, y2))
-        bubbles.append(bubble_crop)
-    return bubbles
+# -----------------------
+# Model Loading & OCR
+# -----------------------
+@st.cache_resource(show_spinner=False)
+def load_models(path: str):
+    return YOLO(path), MangaOcr()
 
-def extract_text_from_bubbles(bubbles, ocr):
-    """
-    Process each detected bubble:
-      - Pre-process the bubble image.
-      - Extract text using manga_ocr.
-    Returns a list of tuples (bubble_image, extracted_text).
-    """
-    bubble_texts = []
-    for bubble in bubbles:
-        enhanced = preprocess_image(bubble)
-        text = ocr(enhanced)
-        bubble_texts.append((bubble, text))
-    return bubble_texts
 
-def classify_text(text):
-    """
-    Dummy text classification that distinguishes between dialogue, sound effects, etc.
-    """
-    return "Sound Effect" if len(text.split()) <= 3 else "Dialogue"
+def detect_and_ocr(
+    pil_img: Image.Image,
+    yolo_model,
+    ocr_engine,
+    conf: float,
+    iou: float
+) -> Tuple[List[Tuple[int,int,int,int]], List[str]]:
+    np_img = np.array(pil_img)[:, :, ::-1]
+    preds = yolo_model.predict(source=np_img, conf=conf, iou=iou, max_det=100, verbose=False)
+    boxes, texts = [], []
+    if preds:
+        raw = preds[0].boxes.xyxy.cpu().numpy().astype(int)
+        for x1, y1, x2, y2 in raw:
+            crop = pil_img.crop((x1, y1, x2, y2))
+            gray = ImageOps.grayscale(crop)
+            enh = ImageEnhance.Contrast(gray).enhance(1.5)
+            ann = ocr_engine(enh)
+            txt = ann if isinstance(ann, str) else ("".join(ann) if all(isinstance(el, str) for el in ann) else " ".join(map(str, ann)))
+            boxes.append((x1, y1, x2, y2))
+            texts.append(txt or "")
+    return boxes, texts
 
-def translate_text(text, target_language="en"):
-    """
-    Dummy translation stub.
-    """
-    return f"[Translated to {target_language}]: {text}"
+# -----------------------
+# Overlay Translation
+# -----------------------
 
-def detect_characters(img):
-    """
-    Placeholder for character detection/recognition.
-    """
-    return []
+def overlay(
+    pil_img: Image.Image,
+    boxes: List[Tuple[int,int,int,int]],
+    texts: List[str],
+    sizes: List[int],
+    colors: List[Tuple[int,int,int]],
+    lang: str
+) -> Image.Image:
+    # Ensure texts are strings
+    texts = [t or "" for t in texts]
+    base = pil_img.convert("RGBA")
+    layer = Image.new("RGBA", base.size, (255,255,255,0))
+    draw = ImageDraw.Draw(layer)
 
-def replace_text_on_image(img, texts, positions):
-    """
-    Overlay translated text onto an image at given positions.
-    """
-    img_copy = img.copy()
-    draw = ImageDraw.Draw(img_copy)
+    # Font paths
+    script_fonts = {
+        "ja": "/usr/share/fonts/opentype/noto/NotoSansJP-Regular.otf",
+        "ko": "/usr/share/fonts/opentype/noto/NotoSansKR-Regular.otf",
+        "hi": "/usr/share/fonts/opentype/noto/NotoSansDevanagari-Regular.otf",
+    }
+    default_font = "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf"
+
+    for idx, ((x1,y1,x2,y2), txt) in enumerate(zip(boxes, texts)):
+        if not txt.strip():
+            continue
+        # Choose font
+        font_path = script_fonts.get(lang, default_font)
+        try:
+            font = ImageFont.truetype(font_path, sizes[idx])
+        except (IOError, OSError):
+            font = ImageFont.load_default()
+
+        # Wrap text
+        max_w = (x2 - x1) - 10
+        words = txt.split()
+        lines, curr = [], ""
+        for w in words:
+            candidate = (curr + " " + w).strip()
+            w_px = draw.textbbox((0,0), candidate, font=font)[2] if hasattr(draw, 'textbbox') else draw.textsize(candidate, font=font)[0]
+            if w_px <= max_w:
+                curr = candidate
+            else:
+                lines.append(curr)
+                curr = w
+        lines.append(curr)
+        final = "\n".join(lines)
+
+        # Measure block
+        if hasattr(draw, 'multiline_textbbox'):
+            wt, ht = draw.multiline_textbbox((0,0), final, font=font, spacing=2)[2:]
+        else:
+            wt, ht = draw.multiline_textsize(final, font=font, spacing=2)
+
+        # Position
+        tx = x1 + max(0, ((x2-x1) - wt)//2)
+        ty = y1 + max(0, ((y2-y1) - ht)//2)
+
+        # Draw background & text
+        draw.rectangle([tx-2, ty-2, tx+wt+2, ty+ht+2], fill=(255,255,255,200))
+        draw.multiline_text((tx, ty), final, font=font, fill=colors[idx], spacing=2, align="center")
+
+    return Image.alpha_composite(base, layer).convert("RGB")
+
+# -----------------------
+# Streamlit App
+# -----------------------
+st.set_page_config(page_title="Manga Batch Translation Demo", layout="wide")
+st.title("🧰 Manga/Manhwa Batch Translation Demo")
+
+# Sidebar
+st.sidebar.header("⚙️ Settings")
+lang = st.sidebar.selectbox("Target Language", ["en","es","ar","pt","id","fr","ja","ru","de","ko","hi"])  
+conf = st.sidebar.slider("Detection Confidence", 0.05, 1.0, 0.25, 0.05)
+iou  = st.sidebar.slider("NMS IoU Threshold",     0.0, 0.9, 0.3, 0.05)
+font_size   = st.sidebar.slider("Overlay Font Size", 12, 48, 20)
+col         = st.sidebar.color_picker("Overlay Font Color", '#0000FF')
+font_color  = hex_to_rgb(col)
+
+# File uploader
+uploads = st.file_uploader("Upload pages (JPG/PNG)", type=["jpg","jpeg","png"], accept_multiple_files=True)
+if not uploads:
+    st.info("Please upload one or more images above.")
+    st.stop()
+
+# Load models
+tf_path = "yolo_train_run/full_finetune_phase2/weights/best.pt"
+if not os.path.exists(tf_path):
+    st.error(f"YOLO model not found at `{tf_path}`")
+    st.stop()
+with st.spinner("Loading models…"):
+    yolo_model, ocr_engine = load_models(tf_path)
+
+# Process pages
+for idx, file in enumerate(uploads, start=1):
     try:
-        font = ImageFont.truetype("arial.ttf", 20)
-    except IOError:
-        font = ImageFont.load_default()
-    for text, pos in zip(texts, positions):
-        draw.text(pos, text, fill="red", font=font)
-    return img_copy
+        img = Image.open(file).convert("RGB")
+    except:
+        st.error(f"Page {idx}: could not open image.")
+        continue
 
-# =========================
-# Main Pipeline Implementation
-# =========================
+    st.subheader(f"Page {idx} - Original")
+    st.image(img, use_container_width=True)
 
-st.title("🧰 Manga/Manhwa Translation Pipeline")
+    boxes, texts = detect_and_ocr(img, yolo_model, ocr_engine, conf, iou)
+    if not boxes:
+        st.warning(f"No bubbles detected on page {idx}.")
+        continue
 
-st.markdown("""
-This pipeline processes uploaded manga/manhwa pages:
-1. **Input & Pre-processing:** Upload a manga/manhwa page.
-2. **Text Detection & Categorization:** Detect speech bubbles, run OCR, and classify text.
-3. **Context & Character Recognition:** (Stub) Detect characters and scene context.
-4. **Translation & Style Customization:** (Stub) Translate extracted text.
-5. **Text Replacement & Image Reconstruction:** (Stub) Overlay translation on image.
-6. **Output:** Display results.
-""")
+    translations = [
+        GoogleTranslator(source='auto', target=lang).translate(txt) if txt.strip() else ""
+        for txt in texts
+    ]
 
-# 1. Input & Pre-processing
-uploaded_file = st.file_uploader(
-    "Upload your manga/manhwa page (JPEG, PNG)", type=["jpeg", "jpg", "png"]
-)
-url = st.text_input("Or paste an image URL")
+    result = overlay(img, boxes, translations, [font_size]*len(boxes), [font_color]*len(boxes), lang)
 
-if uploaded_file:
-    try:
-        original_img = Image.open(uploaded_file)
-        st.success("File uploaded successfully!")
-        st.image(original_img, caption="Original Image")
-    except Exception as e:
-        st.error(f"Failed to open uploaded image: {e}")
-        st.stop()
-elif url:
-    try:
-        response = requests.get(url)
-        response.raise_for_status()
-        original_img = Image.open(io.BytesIO(response.content))
-        st.success("Image fetched successfully from URL!")
-        st.image(original_img, caption="Original Image from URL")
-    except Exception as e:
-        st.error(f"Failed to fetch image from URL: {e}")
-        st.stop()
-else:
-    st.info("Please upload an image or provide a URL.")
-    st.stop()
+    st.subheader(f"Page {idx} - Translated")
+    st.image(result, use_container_width=True)
 
-# 2. Model Loading
-yolo_model_path = "/home/chanakya/chanakya/UNI/translation tool/yolo_train_run/train/weights/best.pt"
-
-if not os.path.exists(yolo_model_path):
-    st.error("YOLOv8 model file not found.")
-    st.stop()
-
-try:
-    bubble_model = YOLO(yolo_model_path)
-except Exception as e:
-    st.error(f"Failed to load YOLO model: {e}")
-    st.stop()
-
-try:
-    ocr = MangaOcr()
-except Exception as e:
-    st.error(f"Failed to initialize Manga OCR: {e}")
-    st.stop()
-
-# 3. Text Detection & Categorization
-st.header("Step 2: Text Detection & Categorization")
-
-with st.spinner("Detecting speech bubbles..."):
-    bubbles = detect_bubbles(original_img, bubble_model)
-
-if not bubbles:
-    st.warning("No speech bubbles detected.")
-    st.stop()
-
-bubble_texts = extract_text_from_bubbles(bubbles, ocr)
-classified_results = [(b, t, classify_text(t)) for b, t in bubble_texts]
-
-st.subheader("Detected Speech Bubbles & OCR Text")
-for i, (bubble, text, category) in enumerate(classified_results):
-    st.image(bubble, caption=f"Bubble {i+1}")
-    st.text_area(
-        f"Extracted Text (Category: {category})",  # visible label
-        text,
-        height=100,
-        key=f"extracted_{category}_{i}"              # unique key!
-    )
-
-# 4. Context & Character Recognition (Stub)
-st.header("Step 3: Context & Character Recognition (Stub)")
-st.write("Detected Characters:", detect_characters(original_img))
-
-# 5. Translation & Style Customization (Stub)
-st.header("Step 4: Translation & Style Customization (Stub)")
-translated_texts = [translate_text(t) for _, t, _ in classified_results]
-for idx, ((_, orig_text, _), tr_text) in enumerate(zip(classified_results, translated_texts)):
-    st.write(f"Original [{idx+1}]: {orig_text}")
-    st.write(f"Translated [{idx+1}]: {tr_text}")
-
-# 6. Text Replacement & Image Reconstruction (Stub)
-st.header("Step 5: Text Replacement & Image Reconstruction (Stub)")
-positions = [(50, 50 + j * 30) for j in range(len(translated_texts))]
-reconstructed_img = replace_text_on_image(original_img, translated_texts, positions)
-st.image(reconstructed_img, caption="Reconstructed Image with Translated Text")
-
-# 7. Final Output & Next Steps
-st.header("Step 6: Output & Next Steps")
-st.markdown("""
-- **Quality Assurance:** Add a human‑review step.
-- **Performance Optimization:** Batch processing, GPU acceleration.
-- **Data Privacy:** Define clear handling policies.
-""")
-
+st.success("🎉 Batch translation complete!")

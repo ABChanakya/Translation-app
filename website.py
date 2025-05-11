@@ -32,12 +32,9 @@ import requests
 import io
 import numpy as np
 from PIL import Image, ImageOps, ImageEnhance, ImageDraw, ImageFont
-import cv2
-
 from ultralytics import YOLO
 from manga_ocr import MangaOcr
 from deep_translator import GoogleTranslator
-from tqdm import tqdm
 
 # -----------------------
 # Utility Functions
@@ -141,7 +138,7 @@ def load_models(path: str):
     ocr  = MangaOcr()
     return yolo, ocr
 
-model_path = "yolo_train_run/full_finetune_phase2/weights/best.pt"
+model_path = "yolo_train_run/full_finetune_phase21/weights/best.pt"
 if not os.path.exists(model_path):
     st.error(f"YOLO model not found at `{model_path}`")
     st.stop()
@@ -216,9 +213,12 @@ st.header("Step 2: Translation")
 translations = []
 for txt in ocr_texts:
     try:
-        tr = GoogleTranslator(source='auto', target=lang).translate(txt)
+        if txt:  # Ensure txt is not None or empty
+            tr = GoogleTranslator(source='auto', target=lang).translate(txt)
+        else:
+            tr = ""
     except:
-        tr = txt
+        tr = txt or ""
     translations.append(tr)
 for i, (orig, tr) in enumerate(zip(ocr_texts, translations), 1):
     st.subheader(f"Bubble {i} Translations")
@@ -236,53 +236,69 @@ def overlay(
     base = pil_img.convert("RGBA")
     layer = Image.new("RGBA", base.size, (255,255,255,0))
     draw = ImageDraw.Draw(layer)
+
+    # Font lookup
+    script_fonts = {
+        "ja": "/usr/share/fonts/opentype/noto/NotoSansJP-Regular.otf",
+        "ko": "/usr/share/fonts/opentype/noto/NotoSansKR-Regular.otf",
+        "hi": "/usr/share/fonts/opentype/noto/NotoSansDevanagari-Regular.otf",
+        # …etc…
+    }
+    default_font = "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf"
+    serif_font  = "/usr/share/fonts/truetype/noto/NotoSerif-Regular.ttf"
+
+
     for idx, ((x1,y1,x2,y2), txt) in enumerate(zip(boxes, texts)):
-        font_size = sizes[idx]
+        # 1) Guard against None
+        txt = txt or ""
+        if not txt.strip():
+            # no text → nothing to draw
+            continue
+
+        font_size  = sizes[idx]
         font_color = colors[idx]
-        # select a font that supports the target script
-        script_fonts = {
-            "ja": "/usr/share/fonts/opentype/noto/NotoSansJP-Regular.otf",
-            "ko": "/usr/share/fonts/opentype/noto/NotoSansKR-Regular.otf",
-            "hi": "/usr/share/fonts/opentype/noto/NotoSansDevanagari-Regular.otf",
-            "te": "/usr/share/fonts/opentype/noto/NotoSansTelugu-Regular.otf",
-            "ta": "/usr/share/fonts/opentype/noto/NotoSansTamil-Regular.otf",
-            "bn": "/usr/share/fonts/opentype/noto/NotoSansBengali-Regular.otf",
-            # add more scripts as needed
-        }
-        font_path = script_fonts.get(lang, "/usr/share/fonts/opentype/noto/NotoSans-Regular.otf")
+        font_path  = script_fonts.get(lang, default_font)
+
+        # 2) Load font, fallback to default PIL font
         try:
             font = ImageFont.truetype(font_path, font_size)
-        except IOError:
+        except (IOError, OSError):
             font = ImageFont.load_default()
 
-        # wrap text inside bubble width
+        # 3) Wrap text to fit bubble width
+        max_width = (x2 - x1) - 10
         words = txt.split()
-        lines, curr = [], ""
+        lines = []
+        curr = ""
         for w in words:
-            test = (curr + " " + w).strip()
+            candidate = (curr + " " + w).strip()
             try:
-                width = draw.textbbox((0,0), test, font=font)[2]
+                w_px = draw.textbbox((0,0), candidate, font=font)[2]
             except AttributeError:
-                width = draw.textsize(test, font=font)[0]
-            if width <= (x2-x1-10):
-                curr = test
+                w_px = draw.textsize(candidate, font=font)[0]
+
+            if w_px <= max_width:
+                curr = candidate
             else:
                 lines.append(curr)
                 curr = w
         lines.append(curr)
         final = "\n".join(lines)
-        # measure multiline block
+
+        # 4) Measure block size
         try:
             wt, ht = draw.multiline_textbbox((0,0), final, font=font, spacing=2)[2:]
         except AttributeError:
             wt, ht = draw.multiline_textsize(final, font=font, spacing=2)
-        tx = x1 + max(0, ((x2-x1)-wt)//2)
-        ty = y1 + max(0, ((y2-y1)-ht)//2)
+
+        # 5) Center inside the bubble
+        tx = x1 + max(0, ((x2 - x1) - wt) // 2)
+        ty = y1 + max(0, ((y2 - y1) - ht) // 2)
+
+        # 6) Draw background & text
         draw.rectangle([tx-2, ty-2, tx+wt+2, ty+ht+2], fill=(255,255,255,200))
-        draw.multiline_text(
-            (tx,ty), final, fill=font_color,
-            font=font, spacing=2, align="center"
-        )
+        draw.multiline_text((tx, ty), final, font=font, fill=font_color, spacing=2, align="center")
+
     return Image.alpha_composite(base, layer).convert("RGB")
 
 with st.spinner("Compositing translated page…"):

@@ -1,3 +1,6 @@
 Dialogue
-Sound Effects
-Signs/labels
+Sound_Effects
+Signs
+Text
+removal
+
