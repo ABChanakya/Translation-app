@@ -297,7 +297,7 @@ def fit_and_wrap_text(
 
 # ---------------------------------------------------------------------------- #
 #                           TRANSLATION ABSTRACTION                            #
-# ---------------------------------------------------------------------------- #
+# ---------------------------------------------------------------------------- ##
 def translate(text: str, src: str, tgt: str, engine: str) -> str:
     """
     Translate *text* from *src* → *tgt* using the chosen *engine*.
