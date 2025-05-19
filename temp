@@ -1943,3 +1943,26 @@ Untracked files:
 	temp
 
 nothing added to commit but untracked files present (use "git add" to track)
+On branch clean
+Your branch is ahead of 'origin/clean' by 2 commits.
+  (use "git push" to publish your local commits)
+
+nothing to commit, working tree clean
+On branch clean
+Your branch is ahead of 'origin/clean' by 2 commits.
+  (use "git push" to publish your local commits)
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   temp
+
+no changes added to commit (use "git add" and/or "git commit -a")
+On branch clean
+Your branch is ahead of 'origin/clean' by 2 commits.
+  (use "git push" to publish your local commits)
+
+Changes to be committed:
+  (use "git restore --staged <file>..." to unstage)
+	modified:   temp
+
