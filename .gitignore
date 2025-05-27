@@ -41,4 +41,7 @@ theshold_sweep_results.json
 yolo11n.pt
 yolov8n.pt           # adjust name if different
 yolov8m.pt
+gemma3-keras-gemma3_4b-v1.tar.gz
 
+*.pt
+*.tar.gz
