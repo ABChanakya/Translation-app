@@ -46,6 +46,10 @@ from transformers import (
     MarianTokenizer,
     MarianMTModel,
 )
+from pathlib import Path
+from enum import Enum
+import ollama
+import base64
 
 import argostranslate.package
 import argostranslate.translate
@@ -278,7 +282,7 @@ def fit_and_wrap_text(
         max_chars = box_w // avg_char_w or 1
         
         # Wrap by words using textwrap
-        wrapped = "\n".join(textwrap.wrap(text, width=max_chars))
+        wrapped = "\n".join(textwrap.wrap(text, width=max_chars,break_long_words=False, break_on_hyphens=False))
         
         # Measure the whole block
         tb = draw.multiline_textbbox((0, 0), wrapped, font=font)
@@ -293,6 +297,32 @@ def fit_and_wrap_text(
     avg_char_w = max(1, m_bbox[2] - m_bbox[0])
     wrapped = "\n".join(textwrap.wrap(text, width=box_w // avg_char_w or 1))
     return wrapped, font
+
+# ---------------------------------------------------------------------------- #
+#                    GEMMA3 TRANSLATION INTEGRATION                            #
+# ---------------------------------------------------------------------------- #
+class ResponseFormat(Enum): JSON = 'json_object'; TEXT = 'text'
+
+def call_model(
+    prompt:str='', image_path:Path|None=None,
+    response_format:ResponseFormat=ResponseFormat.TEXT,
+    system_prompt:str=''
+) -> str:
+    msgs=[]
+    if system_prompt: msgs.append({'role':'system','content':system_prompt})
+    if image_path:
+        b64 = base64.b64encode(Path(image_path).read_bytes()).decode()
+        uri = f"data:image/png;base64,{b64}"
+        msgs.append({'role':'user','content':f'![Image]({uri})\n\n{prompt}'})
+    else:
+        msgs.append({'role':'user','content':prompt})
+    resp = ollama.chat(
+        model='gemma3:4b', messages=msgs, keep_alive='1h',
+        format='' if response_format==ResponseFormat.TEXT else 'json',
+        options={'temperature':1.0,'min_p':0.01,'repeat_penalty':1.0,'top_k':64,'top_p':0.95}
+    )
+    reply = resp.message.content
+    return reply
 
 
 # ---------------------------------------------------------------------------- #
@@ -309,18 +339,43 @@ def translate(text: str, src: str, tgt: str, engine: str) -> str:
         return ""
 
     try:
+        if engine == "Gemma3":
+            # 1) System prompt now mentions both src and tgt
+            system_prompt = (
+                f"You are a world-class translator with deep expertise in {src} and {tgt}. "
+                f"Translate the following {src} text into fluent, idiomatic {tgt}, preserving nuance and tone. "
+                "Output ONLY the translated text, with no commentary or formatting."
+            )
+
+            # 2) Wrap the text and label it clearly
+            user_prompt = (
+                f"=== Begin {src} text ===\n"
+                f"{text}\n"
+                f"=== End {src} text ==="
+            )
+
+            # 3) Call the model
+            reply = call_model(
+                prompt=user_prompt,
+                response_format=ResponseFormat.TEXT,
+                system_prompt=system_prompt
+            )
+            # 4) Debug log of what we got back
+            print("<<< GEMMA3 OUTPUT:\n", reply)
+            # 5) Return the actual reply
+            return reply
         # ── Google Translate (unofficial) ────────────────────────────────
         if engine == "Google":
-            if _GT is None:                           # library missing
+            #if _GT is None:                           # library missing
                 # Check if Argos is installed before falling back
-                if not argostranslate.package.get_installed_packages():
-                    raise RuntimeError("Argos Translate is not installed. Please install it to use as a fallback.")
-                return translate(text, src, tgt, "Argos")
+                #if not argostranslate.package.get_installed_packages():
+                    #raise RuntimeError("Argos Translate is not installed. Please install it to use as a fallback.")
+                #return translate(text, src, tgt, "Argos")
 
-            try:
-                return _GT.translate(text, src=src or "auto", dest=tgt).text
-            except Exception:
-                return translate(text, src, tgt, "Argos")
+            
+            return _GT.translate(text, src=src or "auto", dest=tgt).text
+            
+                #return translate(text, src, tgt, "Argos")
 
         # ── DeepL ────────────────────────────────────────────────────────
         elif engine == "DeepL":
@@ -374,7 +429,7 @@ def translate(text: str, src: str, tgt: str, engine: str) -> str:
 # ---------------------------------------------------------------------------- #
 #                          PROCESSING                                          #
 # ---------------------------------------------------------------------------- #
-# def group_boxes_by_class(result, conf_thresh=.25, iou_thresh=.45):
+#def group_boxes_by_class(result, conf_thresh=.25, iou_thresh=.45):
     groups = {int(k): [] for k in range(len(result.names))}
 
     # collect boxes
@@ -566,7 +621,7 @@ def build_streamlit() -> None:
         tgt_lang   = st.text_input("Target language code",  value="en")
         engine     = st.selectbox(
             "Translation engine",
-            ["MarianMT", "Google", "DeepL", "Azure", "Argos", "NLLB"],
+            ["Gemma3","MarianMT", "Google", "DeepL", "Azure", "Argos", "NLLB"],
         )
         conf       = st.slider("YOLO confidence", 0.1, 1.0, 0.25, 0.05)
         iou_thr    = st.slider("NMS IoU threshold", 0.1, 1.0, 0.45, 0.05)
@@ -638,8 +693,8 @@ def build_gradio() -> None:
             src_lang   = gr.Textbox(value="ja", label="Source lang code")
             tgt_lang   = gr.Textbox(value="en", label="Target lang code")
             engine     = gr.Dropdown(
-                ["Google", "DeepL", "Azure", "Argos", "MarianMT", "NLLB"],
-                value="Google",
+                ["Gemma3","Google", "DeepL", "Azure", "Argos", "MarianMT", "NLLB"],
+                value="Gemma3",
                 label="Engine"
             )
             conf       = gr.Slider(0.1, 1.0, 0.25, label="YOLO confidence")

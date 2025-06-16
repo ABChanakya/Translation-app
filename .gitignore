@@ -14,7 +14,13 @@ pseudo_labels/
 .venv/
 translated_pages/
 yolov10/
-
+manga-translator/__pycache__/
+manga-translator/.venv/
+manga-translator/big_lama_model/
+manga-translator/lama/
+manga-translator/outputs/
+yolo_train_run/train/
+Manga-Panels-1/
 
 # ─── One‑off helper / housekeeping scripts (not needed in repo) ───────────
 keep_ignore_report.json

@@ -107,7 +107,7 @@ def train_on_dataset(
         translate  = 0.15,
         scale      = 0.6,
         project    = "yolo_train_run",
-        name       = "full_finetune_phase11",
+        name       = "full_finetune_phase10",
         exist_ok   = True
     )
 
@@ -132,7 +132,7 @@ def train_on_dataset(
         translate  = 0.1,
         scale      = 0.5,
         project    = "yolo_train_run",
-        name       = "full_finetune_phase21 ",
+        name       = "full_finetune_phase20",
         exist_ok   = True
     )
 
