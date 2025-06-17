@@ -117,6 +117,9 @@ SOUND_EFFECTS = 1
 SIGNS = 2
 TEXT = 3
 REMOVAL = 4
+SFX = SOUND_EFFECTS
+SIGN = SIGNS
+
 # Class IDs
 @st.cache_resource(ttl=86400)
 def get_yolo_model(conf: float = .25, iou: float = .45):
@@ -554,6 +557,12 @@ def find_containing_dialogue(
         if rx1 >= dx1 and ry1 >= dy1 and rx2 <= dx2 and ry2 <= dy2:
             return (dx1, dy1, dx2, dy2)
     return None
+from simple_lama_inpainting import SimpleLama
+
+@st.cache_resource(ttl=86400, show_spinner=False)
+def get_lama_inpainter():
+    # This downloads/caches the LaMa weights on first use
+    return SimpleLama()
 
 # ---------------------------------------------------------------------------- #
 #                          PROCESSING                                          #
@@ -598,6 +607,27 @@ def _process_single_panel(
         for (x1, y1, x2, y2), _ in groups[cls]:
             if x2 - x1 < 20 or y2 - y1 < 20:
                 continue
+
+              # ── If this is SFX or SIGN, inpaint the background first ───────
+            if cls in (SFX, SIGN,TEXT):
+                lama      = get_lama_inpainter()
+                panel_np  = np.array(img)                   # full panel as np
+                mask      = np.zeros(panel_np.shape[:2], np.uint8)
+                mask[y1:y2, x1:x2] = 255
+                # call the model via __call__; it may return PIL.Image or ndarray
+                inpainted = lama(panel_np, mask)
+
+                # handle both return types:
+                if isinstance(inpainted, Image.Image):
+                    img = inpainted
+                    np_img = np.array(inpainted)
+                else:
+                    img = Image.fromarray(inpainted)
+                    np_img = inpainted
+
+                # reset your drawing canvas on the cleaned panel
+                out_img = img.copy()
+                draw    = ImageDraw.Draw(out_img)
 
             # ① crop for OCR (optionally use parent dialogue bubble)
             if cls == REMOVAL and DIALOGUE in groups:
