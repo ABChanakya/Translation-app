@@ -19,7 +19,7 @@ manga-translator/.venv/
 manga-translator/big_lama_model/
 manga-translator/lama/
 manga-translator/outputs/
-
+manga-translator/big-lama.zip
 Manga-Panels-1/
 
 # ─── One‑off helper / housekeeping scripts (not needed in repo) ───────────
