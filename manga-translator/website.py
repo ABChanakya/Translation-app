@@ -25,7 +25,7 @@ import tempfile
 from functools import lru_cache
 from typing import Dict, List, Tuple, Optional, Any
 import textwrap
-
+import asyncio
 import numpy as np
 import cv2
 from PIL import Image, ImageDraw, ImageFont, ImageColor
@@ -239,7 +239,7 @@ def overlay(
         wbox = draw.textbbox((0, 0), txt, font=font)
         tw, th = wbox[2] - wbox[0], wbox[3] - wbox[1]
         cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
-        draw.multiline_text(
+        draw.multiline_text(\
             (cx, cy),
             txt,
             font=font,
@@ -361,9 +361,11 @@ def detect_panels_via_roboflow(pil_image: Image.Image):
 class ResponseFormat(Enum): JSON = 'json_object'; TEXT = 'text'
 
 def call_model(
-    prompt:str='', image_path:Path|None=None,
-    response_format:ResponseFormat=ResponseFormat.TEXT,
-    system_prompt:str=''
+   prompt: str = "",
+    image_path: Path | None = None,
+    response_format: ResponseFormat = ResponseFormat.TEXT,
+    system_prompt: str = "",
+    model: str = "gemma3:27b",
 ) -> str:
     msgs=[]
     if system_prompt: msgs.append({'role':'system','content':system_prompt})
@@ -374,7 +376,7 @@ def call_model(
     else:
         msgs.append({'role':'user','content':prompt})
     resp = ollama.chat(
-        model='gemma3:4b', messages=msgs, keep_alive='1h',
+        model=model, messages=msgs, keep_alive='1h',
         format='' if response_format==ResponseFormat.TEXT else 'json',
         options={'temperature':1.0,'min_p':0.01,'repeat_penalty':1.0,'top_k':64,'top_p':0.95}
     )
@@ -399,9 +401,9 @@ def translate(text: str, src: str, tgt: str, engine: str) -> str:
         if engine == "Gemma3":
             # 1) System prompt now mentions both src and tgt
             system_prompt = (
-                f"You are a world-class translator with deep expertise in {src} and {tgt}. "
-                f"Translate the following {src} text into fluent, idiomatic {tgt}, preserving nuance and tone. "
-                "Output ONLY the translated text, with no commentary or formatting."
+    f"You are gemme3, a world-class translator with deep expertise in {src} and {tgt}. "
+    f"Translate the following {src} text into fluent, idiomatic {tgt}, preserving nuance and tone. "
+    "Output only the translated text, with no commentary or formatting."
             )
 
             # 2) Wrap the text and label it clearly
