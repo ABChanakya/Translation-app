@@ -13,6 +13,7 @@ Run Gradio:
 """
 
 
+
 from __future__ import annotations
 
 import os
@@ -71,6 +72,7 @@ import deepl
 from azure.ai.translation.text import TextTranslationClient
 from azure.core.credentials import AzureKeyCredential
 import requests
+
 
 
 
