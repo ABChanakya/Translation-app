@@ -1,205 +1,111 @@
-#!/usr/bin/env python3
-"""
-website_multi.py – Streamlit demo for batch-detecting speech bubbles, OCRing,
-translating, and overlaying the translation on multiple pages.
-
-Dependencies::
-
-    pip install streamlit ultralytics manga-ocr deep-translator pillow opencv-python tqdm
-
-Run with:
-
-    streamlit run website_multi.py
-"""
 import os
 import asyncio
-import glob
-from typing import List, Tuple
 
-# -----------------------
-# Disable inotify watchers (avoid ENOSPC errors)
-# -----------------------
+# =========================
+# Environment & Async Fixes
+# =========================
+# Force Streamlit watcher to polling
 os.environ["STREAMLIT_WATCH_USE_POLLING"] = "true"
-os.environ["STREAMLIT_SERVER_FILE_WATCHER_TYPE"] = "none"
-
-# -----------------------
-# Async Fix
-# -----------------------
+# Ensure an asyncio loop exists
 try:
     asyncio.get_running_loop()
 except RuntimeError:
     asyncio.set_event_loop(asyncio.new_event_loop())
 
-# -----------------------
+# =========================
 # Imports
-# -----------------------
+# =========================
 import streamlit as st
+from PIL import Image, ImageDraw, ImageFont
 import numpy as np
-from PIL import Image, ImageOps, ImageEnhance, ImageDraw, ImageFont
 from ultralytics import YOLO
-from manga_ocr import MangaOcr
-from deep_translator import GoogleTranslator
 
-# -----------------------
-# Utility Functions
-# -----------------------
-from typing import List, Tuple
-
-def hex_to_rgb(h: str) -> Tuple[int, int, int]:
-    """Convert a hex color string (#RRGGBB) to an RGB tuple."""
-    h = h.lstrip('#')
-    return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
-
-# -----------------------
-# Model Loading & OCR
-# -----------------------
-@st.cache_resource(show_spinner=False)
-def load_models(path: str):
-    return YOLO(path), MangaOcr()
-
-
-def detect_and_ocr(
-    pil_img: Image.Image,
-    yolo_model,
-    ocr_engine,
-    conf: float,
-    iou: float
-) -> Tuple[List[Tuple[int,int,int,int]], List[str]]:
-    np_img = np.array(pil_img)[:, :, ::-1]
-    preds = yolo_model.predict(source=np_img, conf=conf, iou=iou, max_det=100, verbose=False)
-    boxes, texts = [], []
-    if preds:
-        raw = preds[0].boxes.xyxy.cpu().numpy().astype(int)
-        for x1, y1, x2, y2 in raw:
-            crop = pil_img.crop((x1, y1, x2, y2))
-            gray = ImageOps.grayscale(crop)
-            enh = ImageEnhance.Contrast(gray).enhance(1.5)
-            ann = ocr_engine(enh)
-            txt = ann if isinstance(ann, str) else ("".join(ann) if all(isinstance(el, str) for el in ann) else " ".join(map(str, ann)))
-            boxes.append((x1, y1, x2, y2))
-            texts.append(txt or "")
-    return boxes, texts
-
-# -----------------------
-# Overlay Translation
-# -----------------------
-
-def overlay(
-    pil_img: Image.Image,
-    boxes: List[Tuple[int,int,int,int]],
-    texts: List[str],
-    sizes: List[int],
-    colors: List[Tuple[int,int,int]],
-    lang: str
-) -> Image.Image:
-    # Ensure texts are strings
-    texts = [t or "" for t in texts]
-    base = pil_img.convert("RGBA")
-    layer = Image.new("RGBA", base.size, (255,255,255,0))
-    draw = ImageDraw.Draw(layer)
-
-    # Font paths
-    script_fonts = {
-        "ja": "/usr/share/fonts/opentype/noto/NotoSansJP-Regular.otf",
-        "ko": "/usr/share/fonts/opentype/noto/NotoSansKR-Regular.otf",
-        "hi": "/usr/share/fonts/opentype/noto/NotoSansDevanagari-Regular.otf",
+# =========================
+# Helper: Draw detections on image
+# =========================
+def draw_detections(img: Image.Image, model: YOLO, font_size: int) -> Image.Image:
+    # Run detection
+    cv_img = np.array(img.convert("RGB"))
+    results = model.predict(source=cv_img, conf=0.25, iou=0.45, verbose=False)[0]
+    # Map each class to its color and name
+    class_info = {
+        0: ("Dialogue", "#00d8ff"),
+        1: ("Sound Effects", "#ff0000"),
+        2: ("Signs", "#f8f800"),
+        3: ("Text", "#3df53d"),
+        4: ("Removal", "#f786d4"),
     }
-    default_font = "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf"
-
-    for idx, ((x1,y1,x2,y2), txt) in enumerate(zip(boxes, texts)):
-        if not txt.strip():
-            continue
-        # Choose font
-        font_path = script_fonts.get(lang, default_font)
-        try:
-            font = ImageFont.truetype(font_path, sizes[idx])
-        except (IOError, OSError):
-            font = ImageFont.load_default()
-
-        # Wrap text
-        max_w = (x2 - x1) - 10
-        words = txt.split()
-        lines, curr = [], ""
-        for w in words:
-            candidate = (curr + " " + w).strip()
-            w_px = draw.textbbox((0,0), candidate, font=font)[2] if hasattr(draw, 'textbbox') else draw.textsize(candidate, font=font)[0]
-            if w_px <= max_w:
-                curr = candidate
-            else:
-                lines.append(curr)
-                curr = w
-        lines.append(curr)
-        final = "\n".join(lines)
-
-        # Measure block
-        if hasattr(draw, 'multiline_textbbox'):
-            wt, ht = draw.multiline_textbbox((0,0), final, font=font, spacing=2)[2:]
-        else:
-            wt, ht = draw.multiline_textsize(final, font=font, spacing=2)
-
-        # Position
-        tx = x1 + max(0, ((x2-x1) - wt)//2)
-        ty = y1 + max(0, ((y2-y1) - ht)//2)
-
-        # Draw background & text
-        draw.rectangle([tx-2, ty-2, tx+wt+2, ty+ht+2], fill=(255,255,255,200))
-        draw.multiline_text((tx, ty), final, font=font, fill=colors[idx], spacing=2, align="center")
-
-    return Image.alpha_composite(base, layer).convert("RGB")
-
-# -----------------------
-# Streamlit App
-# -----------------------
-st.set_page_config(page_title="Manga Batch Translation Demo", layout="wide")
-st.title("🧰 Manga/Manhwa Batch Translation Demo")
-
-# Sidebar
-st.sidebar.header("⚙️ Settings")
-lang = st.sidebar.selectbox("Target Language", ["en","es","ar","pt","id","fr","ja","ru","de","ko","hi"])  
-conf = st.sidebar.slider("Detection Confidence", 0.05, 1.0, 0.25, 0.05)
-iou  = st.sidebar.slider("NMS IoU Threshold",     0.0, 0.9, 0.3, 0.05)
-font_size   = st.sidebar.slider("Overlay Font Size", 12, 48, 20)
-col         = st.sidebar.color_picker("Overlay Font Color", '#0000FF')
-font_color  = hex_to_rgb(col)
-
-# File uploader
-uploads = st.file_uploader("Upload pages (JPG/PNG)", type=["jpg","jpeg","png"], accept_multiple_files=True)
-if not uploads:
-    st.info("Please upload one or more images above.")
-    st.stop()
-
-# Load models
-tf_path = "yolo_train_run/full_finetune_phase2/weights/best.pt"
-if not os.path.exists(tf_path):
-    st.error(f"YOLO model not found at `{tf_path}`")
-    st.stop()
-with st.spinner("Loading models…"):
-    yolo_model, ocr_engine = load_models(tf_path)
-
-# Process pages
-for idx, file in enumerate(uploads, start=1):
+    draw = ImageDraw.Draw(img)
+    # Prepare font for labels
     try:
-        img = Image.open(file).convert("RGB")
-    except:
-        st.error(f"Page {idx}: could not open image.")
-        continue
+        label_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", font_size)  # increased font size for labels
+    except Exception:
+        label_font = ImageFont.load_default()
+    # Draw detection boxes with labels
+    boxes = results.boxes.xyxy.cpu().numpy()
+    classes = results.boxes.cls.cpu().numpy().astype(int)
+    for box, cls in zip(boxes, classes):
+        x1, y1, x2, y2 = map(int, box)
+        name, color = class_info.get(cls, ("Unknown", "red"))
+        # Draw rectangle
+        draw.rectangle([x1, y1, x2, y2], outline=color, width=2)
+        # Draw label background
+        text_size = draw.textbbox((0,0), name, font=label_font)
+        text_w = text_size[2] - text_size[0]
+        text_h = text_size[3] - text_size[1]
+        # Make sure label background is visible
+        draw.rectangle([x1, y1 - text_h - 4, x1 + text_w + 4, y1], fill=color)
+        # Draw label text
+        draw.text((x1 + 2, y1 - text_h - 2), name, fill="white", font=label_font)
+    return img
 
-    st.subheader(f"Page {idx} - Original")
-    st.image(img, use_container_width=True)
+# =========================
+# Streamlit App
+# =========================
+st.title("🧰 Manga Bubble Detection")
 
-    boxes, texts = detect_and_ocr(img, yolo_model, ocr_engine, conf, iou)
-    if not boxes:
-        st.warning(f"No bubbles detected on page {idx}.")
-        continue
+# Control for label font size
+label_size = st.sidebar.slider(
+    "Label Font Size", min_value=10, max_value=80, value=24, step=2
+)
 
-    translations = [
-        GoogleTranslator(source='auto', target=lang).translate(txt) if txt.strip() else ""
-        for txt in texts
-    ]
+# Image upload
+uploaded = st.file_uploader("Upload a page", type=["jpg","jpeg","png"])
+if not uploaded:
+    st.info("Please upload an image.")
+    st.stop()
+try:
+    img = Image.open(uploaded).convert("RGB")
+except Exception as e:
+    st.error(f"Could not open image: {e}")
+    st.stop()
 
-    result = overlay(img, boxes, translations, [font_size]*len(boxes), [font_color]*len(boxes), lang)
+# Show original
+st.image(img, caption="Original Image", use_column_width=True)
 
-    st.subheader(f"Page {idx} - Translated")
-    st.image(result, use_container_width=True)
+# Load model (cached)
+@st.cache_resource
+def load_model(path: str) -> YOLO:
+    return YOLO(path)
 
-st.success("🎉 Batch translation complete!")
+yolo_path = "yolo_train_run/full_finetune_phase20/weights/best.pt"
+if not os.path.exists(yolo_path):
+    st.error(f"Model not found at {yolo_path}")
+    st.stop()
+model = load_model(yolo_path)
+
+# Run detection and display
+with st.spinner("Detecting bubbles..."):
+    det_img = draw_detections(img.copy(), model, label_size)
+st.image(det_img, caption="Detected Bubbles", use_column_width=True)
+
+# Display legend below the image
+st.markdown(
+    "**Legend:**<br>"
+    "<span style='color:#00d8ff;font-size:1.2em;'>&#9632;</span> Dialogue&nbsp;&nbsp;"
+    "<span style='color:#ff0000;font-size:1.2em;'>&#9632;</span> Sound Effects&nbsp;&nbsp;"
+    "<span style='color:#f8f800;font-size:1.2em;'>&#9632;</span> Signs&nbsp;&nbsp;"
+    "<span style='color:#3df53d;font-size:1.2em;'>&#9632;</span> Text&nbsp;&nbsp;"
+    "<span style='color:#f786d4;font-size:1.2em;'>&#9632;</span> Removal",
+    unsafe_allow_html=True
+)

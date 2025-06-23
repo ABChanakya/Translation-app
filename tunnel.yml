@@ -1,0 +1,10 @@
+version: "2"
+authtoken: 2yuxHdn6Db9vKStbjHWtjhDsvq9_2x8HC6m6zY8eDoeoWmQvA
+
+tunnels:
+  secure-web:
+    proto: http
+    addr: 8000
+    basic_auth:
+      - manga:manga
+
