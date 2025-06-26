@@ -1,0 +1,81 @@
+from __future__ import annotations
+import logging
+import traceback
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+
+def translate(text: str, src: str, tgt: str, engine: str) -> str:
+    """
+    Translate text from src → tgt using the chosen engine.
+    Falls back to Argos → Google if the chosen engine fails.
+    """
+    text = text.strip()
+    if not text:
+        return ""
+
+    try:
+        if engine == "Gemma3":
+            try:
+                system_prompt = (
+                    f"You are a world-class translator with deep expertise in {src} and {tgt}. "
+                    f"Translate the following {src} text into fluent, idiomatic {tgt}, preserving nuance and tone. "
+                    "Output ONLY the translated text, with no commentary or formatting."
+                )
+                user_prompt = (
+                    f"=== Begin {src} text ===\n"
+                    f"{text}\n"
+                    f"=== End {src} text ==="
+                )
+                reply = call_model(
+                    prompt=user_prompt,
+                    response_format=ResponseFormat.TEXT,
+                    system_prompt=system_prompt
+                )
+                logging.info("Gemma3 translation succeeded: %s", reply[:120])
+                return reply
+            except Exception as e:
+                logging.error("Gemma3 translation failed", exc_info=True)
+                return translate(text, src, tgt, "Argos")
+        
+        elif engine == "Google":
+            try:
+                global _GT
+                if _GT is None:
+                    _GT = GoogleTranslator()
+                    logging.info("Initialized Google Translator")
+                result = _GT.translate(text, src=src or "auto", dest=tgt)
+                logging.info("Google translation succeeded: %s", result.text[:120])
+                return result.text
+            except Exception as e:
+                logging.error("Google translation failed", exc_info=True)
+                return text
+
+        elif engine == "Argos":
+            try:
+                if _ensure_argos_pkg(src, tgt):
+                    result = argostranslate.translate.translate(text, src, tgt)
+                    logging.info("Argos translation succeeded: %s", result[:120])
+                    return result
+                else:
+                    raise RuntimeError("Required Argos package not available")
+            except Exception as e:
+                logging.error("Argos translation failed", exc_info=True)
+                return translate(text, src, tgt, "Google")
+
+        else:
+            raise ValueError(f"Unknown translation engine: {engine!r}")
+
+    except Exception as e:
+        if engine not in ("Argos", "Google"):
+            try:
+                logging.info("Falling back to Argos translate")
+                return translate(text, src, tgt, "Argos")
+            except Exception as argos_e:
+                logging.error("Argos translation failed", exc_info=True)
+                logging.info("Falling back to Google translate")
+                return translate(text, src, tgt, "Google")
+        elif engine != "Google":
+            logging.info("Falling back to Google translate")
+            return translate(text, src, tgt, "Google")
+        logging.error("All translation fallbacks failed", exc_info=True)
+        return text

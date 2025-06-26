@@ -1,3 +1,15 @@
+# ─── website.py ──────────────────────────────────────────────────────────────
+# this the current code for the manga translator website
+#  this does the following:
+# 1. Detects manga panels using YOLOv8/9
+# 2. Performs OCR on detected panels
+# 3. Translates the text using various translation engines
+# 4. Redraws the translated text onto the original manga panels
+# 5. Displays the translated manga pages in a web interface (Streamlit or Gradio)
+# 6. Allows users to upload manga pages and see the results in real-time
+# 7. Supports multiple translation engines (Argos Translate, Ollama, Google Translate, DeepL, Azure Translator)
+# 8. Provides options for customizing the translation process (e.g., selecting source/target languages)#
+# ──────────────────────────────────────────────────────────────────────────────
 """
 website.py – Self‑contained dual‑front‑end (Streamlit / Gradio) manga‑page translator.
 
@@ -13,7 +25,6 @@ Run Gradio:
 """
 
 
-
 from __future__ import annotations
 
 import os
@@ -26,6 +37,7 @@ import tempfile
 from functools import lru_cache
 from typing import Dict, List, Tuple, Optional, Any
 import textwrap
+import demo_lama
 
 import numpy as np
 import cv2
@@ -76,7 +88,6 @@ import requests
 
 
 
-
 # ---------------------------------- CONFIG ---------------------------------- #
 YOLO_MODEL_PATH = "yolo_train_run/full_finetune_phase20/weights/best.pt"        # <––– PUT your YOLOv8/9 weights here
 # Example file structure:
@@ -89,15 +100,6 @@ CACHE_DIR = os.path.join(tempfile.gettempdir(), "manga_translator_cache")
 os.makedirs(CACHE_DIR, exist_ok=True)
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 MAX_SIDE = 1600          # shrink page to <=1600 px on longest side
-
-# ---------------------------------------------------------------------------- #
-
-ROBOFLOW_API_KEY = os.getenv("ROBOFLOW_API_KEY", "P6vGDWzSCEIJ02uKfWRE")   # <-- set in your shell
-PROJECT_SLUG     = "manga-panels-jxuz5-lijsg-1gosm-ccatd"  # <-- your model ID
-VERSION          = "1"         # Roboflow model version
-RF_CONFIDENCE    = 0.4         # 0-1 (probability threshold)
-RF_OVERLAP       = 30          # NMS overlap in pixels
-
 
 # Translation model IDs
 MARIAN_PREFIX = "Helsinki-NLP/opus-mt"
@@ -119,9 +121,6 @@ SOUND_EFFECTS = 1
 SIGNS = 2
 TEXT = 3
 REMOVAL = 4
-SFX = SOUND_EFFECTS
-SIGN = SIGNS
-
 # Class IDs
 @st.cache_resource(ttl=86400)
 def get_yolo_model(conf: float = .25, iou: float = .45):
@@ -259,9 +258,7 @@ def load_font(size:int):
         return ImageFont.truetype(FONT_PATH, size)
     except OSError:
         return ImageFont.load_default()
-# ---------------------------------------------------------------------------- #
-#                    FITTING TEXT INTO BOUNDING BOXES                          #
-# ---------------------------------------------------------------------------- #
+
 
 
 def fit_and_wrap_text(
@@ -314,49 +311,6 @@ def fit_and_wrap_text(
     wrapped = "\n".join(textwrap.wrap(text, width=box_w // avg_char_w or 1))
     return wrapped, font
 
-
-
-import requests, io
-
-def detect_panels_via_roboflow(pil_image: Image.Image):
-    """
-    Returns a list of panel bounding-boxes (x1,y1,x2,y2) using Roboflow’s
-    hosted model. Falls back to a single full-page box if the request fails.
-    """
-    if not ROBOFLOW_API_KEY or ROBOFLOW_API_KEY.startswith("YOUR"):
-        return [(0, 0, pil_image.width, pil_image.height)]
-
-    url = f"https://detect.roboflow.com/{PROJECT_SLUG}/{VERSION}"
-    img_bytes = io.BytesIO()
-    pil_image.save(img_bytes, format="PNG")
-    img_bytes = img_bytes.getvalue()
-
-    try:
-        r = requests.post(
-            url,
-            params=dict(
-                api_key=ROBOFLOW_API_KEY,
-                confidence=int(RF_CONFIDENCE * 100),
-                overlap=RF_OVERLAP,
-            ),
-            files={"file": img_bytes},
-            timeout=30,
-        )
-        r.raise_for_status()
-        preds = r.json().get("predictions", [])
-        boxes = [
-            (int(p["x"] - p["width"]  / 2),
-             int(p["y"] - p["height"] / 2),
-             int(p["x"] + p["width"]  / 2),
-             int(p["y"] + p["height"] / 2))
-            for p in preds
-        ]
-        return boxes or [(0, 0, pil_image.width, pil_image.height)]
-    except Exception as e:
-        st.warning(f"Roboflow panel detection failed: {e}")
-        return [(0, 0, pil_image.width, pil_image.height)]
-
-
 # ---------------------------------------------------------------------------- #
 #                    GEMMA3 TRANSLATION INTEGRATION                            #
 # ---------------------------------------------------------------------------- #
@@ -403,8 +357,7 @@ def translate(text: str, src: str, tgt: str, engine: str) -> str:
             system_prompt = (
                 f"You are a world-class translator with deep expertise in {src} and {tgt}. "
                 f"Translate the following {src} text into fluent, idiomatic {tgt}, preserving nuance and tone. "
-                "Output ONLY the translated text, with no commentary or formatting." \
-                "if there same sentence in a previous there is less than 10% that is the same sentence, try a diffrent translation. and dont write me that the text is not wroking just give me back a space bar"
+                "Output ONLY the translated text, with no commentary or formatting."
             )
 
             # 2) Wrap the text and label it clearly
@@ -560,29 +513,35 @@ def find_containing_dialogue(
         if rx1 >= dx1 and ry1 >= dy1 and rx2 <= dx2 and ry2 <= dy2:
             return (dx1, dy1, dx2, dy2)
     return None
-from simple_lama_inpainting import SimpleLama
-
-@st.cache_resource(ttl=86400, show_spinner=False)
-def get_lama_inpainter():
-    # This downloads/caches the LaMa weights on first use
-    return SimpleLama()
 
 # ---------------------------------------------------------------------------- #
 #                          PROCESSING                                          #
 # ---------------------------------------------------------------------------- #
-def _process_single_panel(
-    img: Image.Image,
-    src: str,
-    tgt: str,
+def process_page(
+    pil_img: Image.Image,
+    src_lang: str,
+    tgt_lang: str,
     engine: str,
-    gem_tag: str,
     conf: float,
-    iou: float,
-    color: str
+    iou_thr: float,
+    text_color: str = "#0000FF",
 ) -> Tuple[Image.Image, List[Dict[str, Any]]]:
     """
-    Exactly the old body of process_page, but working on *one* panel 'img'.
-    Returns (translated_panel_image, logs_for_that_panel).
+    Args
+    ----
+    pil_img : PIL.Image
+        Original manga page.
+    src_lang / tgt_lang : ISO 639‑1 codes (“ja”, “en”, …).
+    engine : Which translation back‑end to use.
+    conf / iou_thr : YOLO score & NMS thresholds.
+    text_color : Hex colour for overlay text.
+
+    Returns
+    -------
+    out_img : PIL.Image
+        Page with cleaned bubbles + translated text.
+    logs : list[dict]
+        Per‑region metadata (class, source text, translation, …).
     """
     # ── overlay buffers (collect first, render once at the end) ──────────
     ov_boxes:  list[tuple[int, int, int, int]] = []
@@ -591,46 +550,25 @@ def _process_single_panel(
     ov_colors: list[tuple[int, int, int, int]] = []
 
     # ── prep  ────────────────────────────────────────────────────────────
-    model   = get_yolo_model(conf, iou)
+    model   = get_yolo_model(conf, iou_thr)
     ocr     = get_ocr()
-    np_img  = np.array(img.convert("RGB"))
-    out_img = img.copy()
+    np_img  = np.array(pil_img.convert("RGB"))
+    out_img = pil_img.copy()
     draw    = ImageDraw.Draw(out_img)
     logs: list[Dict[str, Any]] = []
-    text_rgb = ImageColor.getrgb(color)
+    text_rgb = ImageColor.getrgb(text_color)
 
     # ── detect & group  ──────────────────────────────────────────────────
-    det    = model.predict(source=np_img, conf=conf, iou=iou, verbose=False)[0]
-    groups = group_boxes_by_class(det, conf_thresh=conf, iou_thresh=iou)
+    det    = model.predict(source=np_img, conf=conf, iou=iou_thr, verbose=False)[0]
+    groups = group_boxes_by_class(det, conf_thresh=conf, iou_thresh=iou_thr)
 
-    # ── per-region processing  ───────────────────────────────────────────
-    for cls in (SFX, SIGN, TEXT, REMOVAL):
-        name = {SFX: "SFX", SIGN: "SIGN", TEXT: "TEXT", REMOVAL: "REMOVAL"}[cls]
+    # ── per‑region processing  ───────────────────────────────────────────
+    for cls in (SOUND_EFFECTS, SIGNS, TEXT, REMOVAL):
+        name = {SOUND_EFFECTS: "SFX", SIGNS: "SIGN", TEXT: "TEXT", REMOVAL: "REMOVAL"}[cls]
 
         for (x1, y1, x2, y2), _ in groups[cls]:
-            if x2 - x1 < 20 or y2 - y1 < 20:
+            if x2 - x1 < 20 or y2 - y1 < 20:       # skip tiny boxes
                 continue
-
-              # ── If this is SFX or SIGN, inpaint the background first ───────
-            if cls in (SFX, SIGN,TEXT):
-                lama      = get_lama_inpainter()
-                panel_np  = np.array(img)                   # full panel as np
-                mask      = np.zeros(panel_np.shape[:2], np.uint8)
-                mask[y1:y2, x1:x2] = 255
-                # call the model via __call__; it may return PIL.Image or ndarray
-                inpainted = lama(panel_np, mask)
-
-                # handle both return types:
-                if isinstance(inpainted, Image.Image):
-                    img = inpainted
-                    np_img = np.array(inpainted)
-                else:
-                    img = Image.fromarray(inpainted)
-                    np_img = inpainted
-
-                # reset your drawing canvas on the cleaned panel
-                out_img = img.copy()
-                draw    = ImageDraw.Draw(out_img)
 
             # ① crop for OCR (optionally use parent dialogue bubble)
             if cls == REMOVAL and DIALOGUE in groups:
@@ -638,7 +576,7 @@ def _process_single_panel(
                 crop_box = parent if parent else (x1, y1, x2, y2)
             else:
                 crop_box = (x1, y1, x2, y2)
-            sub_img = img.crop(crop_box)
+            sub_img = pil_img.crop(crop_box)
 
             # ② OCR
             try:
@@ -647,16 +585,18 @@ def _process_single_panel(
                 src_text = ""
 
             # ③ translate
-            tgt_text = translate(src_text, src, tgt, engine) if src_text else ""
+            tgt_text = translate(src_text, src_lang, tgt_lang, engine) if src_text else ""
 
             # ④ log
-            logs.append({
-                "class":    name,
-                "src_lang": src,
-                "src_text": src_text,
-                "tgt_lang": tgt,
-                "tgt_text": tgt_text,
-            })
+            logs.append(
+                {
+                    "class": name,
+                    "src_lang": src_lang,
+                    "src_text": src_text,
+                    "tgt_lang": tgt_lang,
+                    "tgt_text": tgt_text,
+                }
+            )
 
             # ⑤ blank background (white for REMOVAL, median colour otherwise)
             patch = np_img[y1:y2, x1:x2]
@@ -676,42 +616,6 @@ def _process_single_panel(
         out_img = overlay(out_img, ov_boxes, ov_texts, ov_sizes, ov_colors)
 
     return out_img, logs
-
-
-def process_page(
-    pil_img: Image.Image,
-    src: str,
-    tgt: str,
-    engine: str,
-    gem_tag: str,
-    conf: float,
-    iou: float,
-    color: str = "#000000",
-) -> Tuple[Image.Image, List[Dict[str, Any]]]:
-    """
-    Top-level page processor: detect panels, run per-panel logic, then reassemble.
-    """
-    # 1) Detect panels first
-    panel_boxes = detect_panels_via_roboflow(pil_img)
-
-    # 2) Prepare final image & logs
-    final_logs: List[Dict[str, Any]] = []
-    final_image = pil_img.copy()
-
-    # 3) Process each panel independently
-    for px1, py1, px2, py2 in panel_boxes:
-        panel_crop = pil_img.crop((px1, py1, px2, py2))
-
-        translated_panel, panel_logs = _process_single_panel(
-            panel_crop, src, tgt, engine, gem_tag,
-            conf, iou, color
-        )
-
-        # paste translated panel back into page
-        final_image.paste(translated_panel, (px1, py1))
-        final_logs.extend(panel_logs)
-
-    return final_image, final_logs
 
 
 
@@ -750,14 +654,13 @@ def build_streamlit() -> None:
         pil_img = Image.open(img_file).convert("RGB")
         with st.spinner("Detecting & Translating …"):
             out_img, logs = process_page(
-            pil_img,
-            src=src_lang,
-            tgt=tgt_lang,
-            engine=engine,
-            gem_tag="gemma3:4b",
-            conf=conf,
-            iou=iou_thr,
-            color=text_color,
+                pil_img,
+                src_lang=src_lang,
+                tgt_lang=tgt_lang,
+                engine=engine,
+                conf=conf,
+                iou_thr=iou_thr,
+                text_color=text_color,
             )
 
         # 3️⃣ show translated page
@@ -782,19 +685,16 @@ def build_gradio() -> None:
     def gr_process(img, src_lang, tgt_lang, engine, conf, iou, text_color):
         if img is None:
             return None, "No image"
-        # ⬇ REPLACE the old call (src_lang= …) with this:
-        pil_img = Image.fromarray(img)
+        pil_img = Image.fromarray(img).convert("RGB")
         out_img, logs = process_page(
-        pil_img,
-        src=src_lang,
-        tgt=tgt_lang,
-        engine=engine,
-        gem_tag="gemma3:4b",
-        conf=conf,
-        iou=iou,
-        color=text_color,
-    )
-
+            pil_img,
+            src_lang=src_lang,
+            tgt_lang=tgt_lang,
+            engine=engine,
+            conf=conf,
+            iou_thr=iou,
+            text_color=text_color,
+        )
         return np.array(out_img), json.dumps(logs, ensure_ascii=False, indent=2)
 
     with gr.Blocks(title="Manga Translator") as demo:

@@ -401,11 +401,13 @@ def translate(text: str, src: str, tgt: str, engine: str) -> str:
         if engine == "Gemma3":
             # 1) System prompt now mentions both src and tgt
             system_prompt = (
-                f"You are a world-class translator with deep expertise in {src} and {tgt}. "
-                f"Translate the following {src} text into fluent, idiomatic {tgt}, preserving nuance and tone. "
-                "Output ONLY the translated text, with no commentary or formatting." \
-                "if there same sentence in a previous there is less than 10% that is the same sentence, try a diffrent translation. and dont write me that the text is not wroking just give me back a space bar"
-            )
+    f"You are an AI translation specialist with native-level mastery of both {src} and {tgt}. "
+    f"Translate the following {src} text into fluent, idiomatic {tgt}, preserving meaning, tone, register, and cultural nuance. "
+    "Adapt idioms, metaphors, and stylistic flourishes so they feel completely natural to a native reader. "
+    "Maintain consistency in terminology, names, and character voice. "
+    "Always provide exactly one translation—do not include alternative renderings, footnotes, or commentary. "
+    "Output only the translated text, with no labels, markup, or explanatory notes."
+)
 
             # 2) Wrap the text and label it clearly
             user_prompt = (
@@ -686,7 +688,7 @@ def process_page(
     gem_tag: str,
     conf: float,
     iou: float,
-    color: str = "#000000",
+    color: str = "#0000FF",
 ) -> Tuple[Image.Image, List[Dict[str, Any]]]:
     """
     Top-level page processor: detect panels, run per-panel logic, then reassemble.
@@ -736,42 +738,43 @@ def build_streamlit() -> None:
         iou_thr    = st.slider("NMS IoU threshold", 0.1, 1.0, 0.45, 0.05)
         text_color = st.color_picker("Overlay text color", "#0000FF")
 
-    # ── file input ───────────────────────────────────────────────────────────
-    img_file = st.file_uploader("Upload manga page",
-                                type=["png", "jpg", "jpeg"])
+    # ── multiple‐file uploader ────────────────────────────────────────────────
+    uploaded_files = st.file_uploader(
+        "Upload one or more manga pages",
+        type=["png", "jpg", "jpeg"],
+        accept_multiple_files=True
+    )
 
-    # ‼️ everything that touches the file stays **inside** this guard
-    if img_file:
-        # 1️⃣ preview original
-        st.image(img_file, caption="Original Page",
-                 use_container_width=True)
+    if uploaded_files:
+        for img_file in uploaded_files:
+            # 1️⃣ preview original
+            st.image(img_file, caption=f"Original: {img_file.name}", use_container_width=True)
 
-        # 2️⃣ run the translation pipeline
-        pil_img = Image.open(img_file).convert("RGB")
-        with st.spinner("Detecting & Translating …"):
-            out_img, logs = process_page(
-            pil_img,
-            src=src_lang,
-            tgt=tgt_lang,
-            engine=engine,
-            gem_tag="gemma3:4b",
-            conf=conf,
-            iou=iou_thr,
-            color=text_color,
-            )
+            # 2️⃣ run translation
+            pil_img = Image.open(img_file).convert("RGB")
+            with st.spinner(f"Translating {img_file.name}…"):
+                out_img, logs = process_page(
+                    pil_img,
+                    src=src_lang,
+                    tgt=tgt_lang,
+                    engine=engine,
+                    gem_tag="gemma3:4b",
+                    conf=conf,
+                    iou=iou_thr,
+                    color=text_color,
+                )
 
-        # 3️⃣ show translated page
-        st.image(out_img, caption="Translated",
-                 use_container_width=True)
+            # 3️⃣ show translated
+            st.image(out_img, caption=f"Translated: {img_file.name}", use_container_width=True)
 
-        # 4️⃣ show per‑bubble logs
-        for log in logs:
-            with st.expander(f"{log['class']}  "
-                             f"({log['src_lang']} → {log['tgt_lang']})"):
-                st.write("Src:", log["src_text"] or "—")
-                st.write("Tgt:", log["tgt_text"] or "—")
+            # 4️⃣ per-bubble logs
+            for log in logs:
+                with st.expander(f"{log['class']} ({log['src_lang']} → {log['tgt_lang']})"):
+                    st.write("Src:", log["src_text"] or "—")
+                    st.write("Tgt:", log["tgt_text"] or "—")
 
-    st.caption("All processing is local · models are cached for speed.")
+        st.caption("All processing is local · models are cached for speed.")
+
 
 
 # ---------------------------------------------------------------------------- #

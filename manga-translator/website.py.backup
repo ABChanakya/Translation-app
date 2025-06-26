@@ -11,10 +11,12 @@ Run Streamlit (default):
 Run Gradio:
     WEB_UI=gradio python website.py
 """
-
-
-
 from __future__ import annotations
+
+import torch
+# Prevent Streamlit’s file-watcher from poking torch.classes
+torch.classes.__path__ = []
+
 
 import os
 import io
@@ -72,7 +74,6 @@ import deepl
 from azure.ai.translation.text import TextTranslationClient
 from azure.core.credentials import AzureKeyCredential
 import requests
-
 
 
 
@@ -403,8 +404,7 @@ def translate(text: str, src: str, tgt: str, engine: str) -> str:
             system_prompt = (
                 f"You are a world-class translator with deep expertise in {src} and {tgt}. "
                 f"Translate the following {src} text into fluent, idiomatic {tgt}, preserving nuance and tone. "
-                "Output ONLY the translated text, with no commentary or formatting." \
-                "if there same sentence in a previous there is less than 10% that is the same sentence, try a diffrent translation. and dont write me that the text is not wroking just give me back a space bar"
+                "Output ONLY the translated text, with no commentary or formatting."
             )
 
             # 2) Wrap the text and label it clearly
@@ -686,7 +686,7 @@ def process_page(
     gem_tag: str,
     conf: float,
     iou: float,
-    color: str = "#000000",
+    color: str = "#0000FF",
 ) -> Tuple[Image.Image, List[Dict[str, Any]]]:
     """
     Top-level page processor: detect panels, run per-panel logic, then reassemble.
