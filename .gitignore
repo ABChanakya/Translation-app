@@ -21,6 +21,7 @@ manga-translator/lama/
 manga-translator/outputs/
 manga-translator/big-lama.zip
 Manga-Panels-1/
+data/
 
 # ─── One‑off helper / housekeeping scripts (not needed in repo) ───────────
 keep_ignore_report.json

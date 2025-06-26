@@ -78,7 +78,7 @@ import requests
 
 
 # ---------------------------------- CONFIG ---------------------------------- #
-YOLO_MODEL_PATH = "yolo_train_run/full_finetune_phase20/weights/best.pt"        # <––– PUT your YOLOv8/9 weights here
+YOLO_MODEL_PATH = "yolo_train_run/full_finetune_phase40/weights/best.pt"        # <––– PUT your YOLOv8/9 weights here
 # Example file structure:
 # yolo_train_run/
 # ├── full_finetune_phase20/
@@ -376,7 +376,7 @@ def call_model(
     else:
         msgs.append({'role':'user','content':prompt})
     resp = ollama.chat(
-        model='gemma3:4b', messages=msgs, keep_alive='1h',
+        model='gemma3:12b', messages=msgs, keep_alive='1h',
         format='' if response_format==ResponseFormat.TEXT else 'json',
         options={'temperature':1.0,'min_p':0.01,'repeat_penalty':1.0,'top_k':64,'top_p':0.95}
     )
@@ -403,7 +403,8 @@ def translate(text: str, src: str, tgt: str, engine: str) -> str:
             system_prompt = (
                 f"You are a world-class translator with deep expertise in {src} and {tgt}. "
                 f"Translate the following {src} text into fluent, idiomatic {tgt}, preserving nuance and tone. "
-                "Output ONLY the translated text, with no commentary or formatting."
+                "Output ONLY the translated text, with no commentary or formatting." \
+                "if there same sentence in a previous there is less than 10% that is the same sentence, try a diffrent translation. and dont write me that the text is not wroking just give me back a space bar"
             )
 
             # 2) Wrap the text and label it clearly

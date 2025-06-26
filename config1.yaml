@@ -1,6 +1,6 @@
 nc: 5
-train: "/home/chanakya/chanakya/UNI/translation_tool/data/images/train"
-val:   "/home/chanakya/chanakya/UNI/translation_tool/data/images/val"
+train: "/home/chanakya/chanakya/UNI/translation_tool/data2/images/train"
+val:   "/home/chanakya/chanakya/UNI/translation_tool/data2/images/val"
 names:
   0: Dialogue
   1: Sound_Effects

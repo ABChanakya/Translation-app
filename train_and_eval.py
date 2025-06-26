@@ -11,8 +11,8 @@ Finally runs inference with tighter NMS.
 
 Usage:
     python train_and_eval.py \
-      --model /home/chanakya/Downloads/comic-speech-bubble-detector.pt  \
-      --data config.yaml \
+      --model yolo_train_run/full_finetune_phase20/weights/best.pt  \
+      --data config1.yaml \
       --device cuda \
       --head_epochs 20 \
       --full_epochs 80 \
@@ -81,7 +81,7 @@ def train_on_dataset(
         translate  = 0.15,
         scale      = 0.6,
         project    = "yolo_train_run",
-        name       = "head_warmup2",
+        name       = "head_warmup4",
         exist_ok   = True
     )
 
@@ -107,7 +107,7 @@ def train_on_dataset(
         translate  = 0.15,
         scale      = 0.6,
         project    = "yolo_train_run",
-        name       = "full_finetune_phase10",
+        name       = "full_finetune_phase30",
         exist_ok   = True
     )
 
@@ -132,7 +132,7 @@ def train_on_dataset(
         translate  = 0.1,
         scale      = 0.5,
         project    = "yolo_train_run",
-        name       = "full_finetune_phase20",
+        name       = "full_finetune_phase40",
         exist_ok   = True
     )
 
