@@ -31,7 +31,7 @@ def draw_detections(img: Image.Image, model: YOLO, font_size: int) -> Image.Imag
     class_info = {
         0: ("Dialogue", "#00d8ff"),
         1: ("Sound Effects", "#ff0000"),
-        2: ("Signs", "#f8f800"),
+        2: ("Signs", "#cbf8003d"),
         3: ("Text", "#3df53d"),
         4: ("Removal", "#f786d4"),
     }

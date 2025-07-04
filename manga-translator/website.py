@@ -732,9 +732,9 @@ def build_streamlit() -> None:
             "Translation engine",
             ["Gemma3","MarianMT", "Google", "DeepL", "Azure", "Argos", "NLLB"],
         )
-        conf       = st.slider("YOLO confidence", 0.1, 1.0, 0.25, 0.05)
-        iou_thr    = st.slider("NMS IoU threshold", 0.1, 1.0, 0.45, 0.05)
-        text_color = st.color_picker("Overlay text color", "#0000FF")
+        conf       = st.slider("YOLO confidence", 0.1, 1.0, 0.1, 0.05)
+        iou_thr    = st.slider("NMS IoU threshold", 0.1, 1.0, 0.20, 0.05)
+        text_color = st.color_picker("Overlay text color", "#000000")
 
     # ── file input ───────────────────────────────────────────────────────────
     img_file = st.file_uploader("Upload manga page",

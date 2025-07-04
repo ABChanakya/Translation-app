@@ -81,7 +81,7 @@ except Exception as e:
     st.stop()
 
 # Show original
-st.image(img, caption="Original Image", use_container_width=True)
+#st.image(img, caption="Original Image", use_container_width=True)
 
 # Load model (cached)
 @st.cache_resource
