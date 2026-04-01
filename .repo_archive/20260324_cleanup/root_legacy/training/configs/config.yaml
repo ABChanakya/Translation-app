@@ -1,7 +1,0 @@
-nc: 3
-train: "/home/chanakya/chanakya/UNI/translation_tool/data2/images/train"
-val:   "/home/chanakya/chanakya/UNI/translation_tool/data2/images/val"
-names:
-  0: Dialogue
-  1: Sound_Effects
-  2: Signs_Labels
