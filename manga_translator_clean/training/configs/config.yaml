@@ -1,0 +1,12 @@
+# Backwards-compatible config kept for older commands.
+# The repository now uses the same local 5-class dataset everywhere by default.
+path: ../../
+train: data/additional_data/images/train
+val: data/additional_data/images/val
+nc: 5
+names:
+  0: Dialogue
+  1: Sound_Effects
+  2: Signs
+  3: Text
+  4: removal

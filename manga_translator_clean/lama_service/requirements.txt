@@ -1,0 +1,18 @@
+# lama_service/requirements.txt
+
+# Flask for the web service
+flask
+
+# LaMa Inpainting and its specific dependencies
+simple-lama-inpainting
+torch
+torchvision
+torchaudio
+
+# Pillow version required by LaMa
+Pillow<10.0.0
+
+# Other necessary libraries
+numpy
+opencv-python-headless
+gunicorn

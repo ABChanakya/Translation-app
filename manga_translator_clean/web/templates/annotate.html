@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Annotate - Manga Translation Developer Kit{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="fas fa-tags"></i> Data Annotation</h1>
+    <p>Create and manage training datasets for manga text detection</p>
+</div>
+
+<div class="annotation-container">
+    <div class="annotation-tools">
+        <div class="tool-group">
+            <h3>Annotation Tools</h3>
+            <button class="tool-btn active" data-tool="box">
+                <i class="fas fa-square"></i> Box
+            </button>
+            <button class="tool-btn" data-tool="polygon">
+                <i class="fas fa-draw-polygon"></i> Polygon
+            </button>
+            <button class="tool-btn" data-tool="select">
+                <i class="fas fa-mouse-pointer"></i> Select
+            </button>
+        </div>
+
+        <div class="class-group">
+            <h3>Classes</h3>
+            <div class="class-list" id="classList">
+                <button class="class-btn active" data-class="text">Text Bubble</button>
+                <button class="class-btn" data-class="sfx">Sound Effect</button>
+                <button class="class-btn" data-class="title">Title</button>
+            </div>
+        </div>
+
+        <div class="action-group">
+            <button class="btn btn-success" onclick="saveAnnotations()">
+                <i class="fas fa-save"></i> Save
+            </button>
+            <button class="btn btn-secondary" onclick="clearAnnotations()">
+                <i class="fas fa-eraser"></i> Clear
+            </button>
+            <button class="btn btn-primary" onclick="exportDataset()">
+                <i class="fas fa-download"></i> Export Dataset
+            </button>
+        </div>
+    </div>
+
+    <div class="annotation-canvas-container">
+        <canvas id="annotationCanvas"></canvas>
+        <div class="canvas-controls">
+            <button onclick="prevImage()"><i class="fas fa-chevron-left"></i> Previous</button>
+            <span id="imageCounter">0 / 0</span>
+            <button onclick="nextImage()">Next <i class="fas fa-chevron-right"></i></button>
+        </div>
+    </div>
+
+    <div class="annotation-list">
+        <h3>Current Annotations</h3>
+        <div id="annotationsList" class="annotations-items">
+            <p>No annotations yet</p>
+        </div>
+    </div>
+</div>
+
+<div class="dataset-manager">
+    <h3>Dataset Manager</h3>
+    <div class="dataset-stats">
+        <div class="stat-card">
+            <h4>Total Images</h4>
+            <p id="totalImages">0</p>
+        </div>
+        <div class="stat-card">
+            <h4>Annotated</h4>
+            <p id="annotatedImages">0</p>
+        </div>
+        <div class="stat-card">
+            <h4>Total Boxes</h4>
+            <p id="totalBoxes">0</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/annotate.js') }}"></script>
+{% endblock %}

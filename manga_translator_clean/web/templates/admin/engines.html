@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Engines - {{ product_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="fas fa-plug"></i> Translation Engine Registry</h1>
+    <p>Keep many engines structured in the codebase without letting partially configured ones break the public app.</p>
+</div>
+
+<section class="panel">
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Engine</th>
+                    <th>Status</th>
+                    <th>Implemented</th>
+                    <th>Reason</th>
+                    <th>How to Enable</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for engine in engine_statuses %}
+                <tr>
+                    <td>{{ engine.label }}</td>
+                    <td>{% if engine.enabled %}<span class="status-ok">Enabled</span>{% else %}<span class="status-warning">Disabled</span>{% endif %}</td>
+                    <td>{{ "yes" if engine.implemented else "future" }}</td>
+                    <td>{{ engine.disable_reason or "Ready" }}</td>
+                    <td>{{ engine.enable_instructions }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

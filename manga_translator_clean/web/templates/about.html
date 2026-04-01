@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}About - {{ product_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="fas fa-circle-info"></i> About {{ product_name }}</h1>
+    <p>Project workflow, demo framing, and future-ready notes for scaling and accessibility.</p>
+</div>
+
+<div class="dashboard-grid">
+    <section class="panel">
+        <h2><i class="fas fa-diagram-project"></i> Product Workflow</h2>
+        <div class="feature-list">
+            <div class="mode-feature"><i class="fas fa-check"></i> Detect dialogue, sound effects, signs, text, and removal regions.</div>
+            <div class="mode-feature"><i class="fas fa-check"></i> OCR each detected region, translate it, remove the source text, and render the translated result back into the page.</div>
+            <div class="mode-feature"><i class="fas fa-check"></i> Evaluate the detector with mAP plus class-fair macro/per-class reporting so weak classes stay visible.</div>
+            <div class="mode-feature"><i class="fas fa-check"></i> Keep training, evaluation, engine diagnostics, and dataset bootstrapping behind the admin wall.</div>
+        </div>
+    </section>
+    <section class="panel">
+        <h2><i class="fas fa-display"></i> Demo Framing</h2>
+        <div class="feature-list">
+            <div class="mode-feature"><i class="fas fa-check"></i> Public demo: translate one page, then run a batch job.</div>
+            <div class="mode-feature"><i class="fas fa-check"></i> Show the secondary colorization tab as a preserved extension point.</div>
+            <div class="mode-feature"><i class="fas fa-check"></i> Admin demo: open an evaluation report and point out macro/per-class metrics for weak classes.</div>
+            <div class="mode-feature"><i class="fas fa-check"></i> Admin demo: show assisted data generation with review manifests for approve / reject / uncertain image-level review.</div>
+        </div>
+    </section>
+    <section class="panel">
+        <h2><i class="fas fa-memory"></i> Low-RAM and Future Scaling</h2>
+        <div class="feature-list">
+            <div class="mode-feature"><i class="fas fa-check"></i> Models are loaded lazily rather than all at startup.</div>
+            <div class="mode-feature"><i class="fas fa-check"></i> Batch translation is processed in smaller server-side chunks and saved to disk incrementally.</div>
+            <div class="mode-feature"><i class="fas fa-flag"></i> Future work: queue-backed jobs, resumable batches, storage-backed manifests, and multi-machine execution.</div>
+        </div>
+    </section>
+    <section class="panel">
+        <h2><i class="fas fa-universal-access"></i> Accessibility Reservation</h2>
+        <div class="feature-list">
+            <div class="mode-feature"><i class="fas fa-flag"></i> Reserve future hooks for screen-reader-friendly upload/results areas.</div>
+            <div class="mode-feature"><i class="fas fa-flag"></i> Keep extracted and translated text structured so text-to-speech or readout support can be added later.</div>
+            <div class="mode-feature"><i class="fas fa-flag"></i> Future work: keyboard-first navigation, OCR readout, audio summaries, and blind-user workflows.</div>
+        </div>
+    </section>
+</div>
+{% endblock %}

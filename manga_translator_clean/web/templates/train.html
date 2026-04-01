@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Train Models - Manga Translation Developer Kit{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="fas fa-dumbbell"></i> Model Training</h1>
+    <p>Train custom YOLO models for manga text detection</p>
+</div>
+
+<div class="training-container">
+    <div class="training-section">
+        <h3>Training Configuration</h3>
+        
+        <div class="form-grid">
+            <div class="form-group">
+                <label for="modelSize">Model Size:</label>
+                <select id="modelSize" class="form-control">
+                    <option value="yolo11n">YOLO11 Nano (Fastest)</option>
+                    <option value="yolo11s">YOLO11 Small</option>
+                    <option value="yolo11m" selected>YOLO11 Medium (Recommended)</option>
+                    <option value="yolo11l">YOLO11 Large</option>
+                    <option value="yolo11x">YOLO11 XLarge (Best Accuracy)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="dataset">Dataset:</label>
+                <select id="dataset" class="form-control">
+                    <option value="">Select dataset...</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="epochs">Epochs:</label>
+                <input type="number" id="epochs" class="form-control" value="100" min="1" max="500">
+            </div>
+
+            <div class="form-group">
+                <label for="batchSize">Batch Size:</label>
+                <input type="number" id="batchSize" class="form-control" value="16" min="1" max="64">
+            </div>
+
+            <div class="form-group">
+                <label for="imageSize">Image Size:</label>
+                <input type="number" id="imageSize" class="form-control" value="640" step="32">
+            </div>
+
+            <div class="form-group">
+                <label for="patience">Early Stopping Patience:</label>
+                <input type="number" id="patience" class="form-control" value="50" min="1">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>
+                <input type="checkbox" id="useAugmentation" checked>
+                Use Data Augmentation
+            </label>
+        </div>
+
+        <div class="form-group">
+            <label>
+                <input type="checkbox" id="usePretrained" checked>
+                Use Pretrained Weights
+            </label>
+        </div>
+
+        <button class="btn btn-success btn-lg" id="trainBtn" onclick="startTraining()">
+            <i class="fas fa-play"></i> Start Training
+        </button>
+    </div>
+
+    <div class="monitoring-section">
+        <h3>Training Progress</h3>
+        <div id="trainingStatus" class="status-box">
+            <p>No training in progress</p>
+        </div>
+
+        <div id="metricsContainer" style="display: none;">
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <h4>Loss</h4>
+                    <canvas id="lossChart"></canvas>
+                </div>
+                <div class="metric-card">
+                    <h4>mAP</h4>
+                    <canvas id="mapChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="models-section">
+        <h3>Available Models</h3>
+        <div id="modelsList" class="models-list">
+            <p>Loading models...</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='js/train.js') }}"></script>
+{% endblock %}

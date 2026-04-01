@@ -1,0 +1,67 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+manga-env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Model files (large)
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.bin
+*.onnx
+
+# Cache directories
+__pycache__/
+.pytest_cache/
+.cache/
+
+# Temporary files
+*.tmp
+*.log
+tmp/
+temp/
+
+# Output directories
+outputs/
+translated_output/
+translated_pages/
+
+# Data directories (optional - uncomment if needed)
+# data/
+# data1/
+# data2/
+
+# Environment variables
+.env
+.env.local
+
+# Jupyter notebooks
+*.ipynb_checkpoints/
+
+# Test coverage
+.coverage
+htmlcov/

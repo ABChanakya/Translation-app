@@ -1,0 +1,41 @@
+# Alternate dataset config for the same project-local dataset.
+path: ../../
+train: data/additional_data/images/train
+val: data/additional_data/images/val
+test: data/training_data/images/val
+
+nc: 5
+names:
+  0: Dialogue
+  1: Sound_Effects
+  2: Signs
+  3: Text
+  4: removal
+
+# Optional: Training hyperparameters (override defaults)
+# These can be used with the training pipeline
+# Uncomment to use:
+
+# hyperparameters:
+#   lr0: 0.01  # initial learning rate
+#   lrf: 0.01  # final learning rate
+#   momentum: 0.937
+#   weight_decay: 0.0005
+#   warmup_epochs: 3.0
+#   warmup_momentum: 0.8
+#   warmup_bias_lr: 0.1
+#   box: 7.5  # box loss gain
+#   cls: 0.5  # classification loss gain
+#   dfl: 1.5  # DFL loss gain
+#   hsv_h: 0.015  # HSV-Hue augmentation
+#   hsv_s: 0.7  # HSV-Saturation augmentation
+#   hsv_v: 0.4  # HSV-Value augmentation
+#   degrees: 0.0  # rotation degrees
+#   translate: 0.1  # translation
+#   scale: 0.5  # scaling
+#   shear: 0.0  # shear degrees
+#   perspective: 0.0  # perspective
+#   flipud: 0.0  # flip up-down probability
+#   fliplr: 0.5  # flip left-right probability
+#   mosaic: 1.0  # mosaic augmentation probability
+#   mixup: 0.0  # mixup augmentation probability

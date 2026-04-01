@@ -1,0 +1,67 @@
+# ═══════════════════════════════════════════════════════════════════════════
+#                    MANGA TRANSLATOR - ESSENTIAL DEPENDENCIES
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Core dependencies (required)
+numpy>=1.21.0
+opencv-python>=4.5.0
+pillow>=9.0.0
+torch>=2.0.0
+torchvision>=0.15.0
+ultralytics>=8.0.0
+manga-ocr>=0.1.10
+transformers>=4.30.0
+pyyaml>=6.0.0
+requests>=2.25.0
+tqdm>=4.60.0
+
+# Web UI
+flask>=2.0.0
+streamlit>=1.20.0
+gradio>=3.0.0
+
+# Utilities
+matplotlib>=3.5.0
+pandas>=1.3.0
+scipy>=1.7.0
+scikit-image>=0.19.0
+
+# Optional but recommended
+rich>=10.0.0
+jupyter>=1.0.0
+notebook>=6.0.0
+
+# Model-specific dependencies
+kornia>=0.6.0
+einops>=0.6.0
+timm>=0.6.0
+albumentations>=1.0.0
+easydict>=1.9
+psutil>=5.8.0
+sentencepiece>=0.1.95
+safetensors>=0.3.0
+
+# Translation engines (optional)
+# Note: Using googletrans 3.1.0a0 (sync version) instead of 4.x (async)
+googletrans==3.1.0a0
+deepl>=1.12.0
+argostranslate>=1.8.0
+ctranslate2>=3.15.0
+
+# Model management and downloading
+huggingface-hub>=0.16.0       # Download models from HuggingFace
+accelerate>=0.20.0            # Model acceleration and device management
+bitsandbytes>=0.40.0          # Quantization for large models (optional)
+
+# Gemma model support
+transformers>=4.30.0          # Already included above but ensuring compatibility
+torch>=2.0.0                 # Already included above
+
+# Custom model utilities
+torchvision>=0.15.0          # For your custom YOLO models
+ultralytics>=8.0.0           # YOLO model loading and inference
+
+# Model caching and optimization  
+datasets>=2.10.0             # Dataset loading if needed
+tokenizers>=0.13.0           # Fast tokenizers
+safetensors>=0.3.0           # Safe model loading

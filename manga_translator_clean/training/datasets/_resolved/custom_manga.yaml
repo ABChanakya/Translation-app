@@ -1,0 +1,16 @@
+path: /home/chanakya/chanakya/Translation_tool-2/manga_translator_clean
+train: /home/chanakya/chanakya/UNI/translation_tool/data2/images/train
+val: /home/chanakya/chanakya/UNI/translation_tool/data2/images/val
+nc: 5
+names:
+  0: Dialogue
+  1: Sound_Effects
+  2: Signs
+  3: Text
+  4: removal
+dataset_info:
+  name: Custom Manga Detection Dataset
+  version: '2.0'
+  description: 5-class manga text-region dataset for training and evaluation
+  source: Project symlinked dataset
+  annotation_tool: YOLO format

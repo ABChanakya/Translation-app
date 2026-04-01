@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}Evaluation - {{ product_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="fas fa-chart-line"></i> Admin Evaluation</h1>
+    <p>Run a report that keeps underrepresented classes visible with macro and per-class metrics plus box-level IoU analysis.</p>
+</div>
+
+<div class="dashboard-grid">
+    <section class="panel">
+        <h2><i class="fas fa-play"></i> Launch Evaluation</h2>
+        <form method="post" action="{{ url_for('admin_launch_evaluation') }}" class="admin-form">
+            <div class="form-group">
+                <label for="model">Model</label>
+                <select id="model" name="model" class="form-control">
+                    {% for model in models %}
+                        <option value="{{ model.path }}">{{ model.path }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="data">Dataset</label>
+                <select id="data" name="data" class="form-control">
+                    <option value="{{ default_dataset }}">{{ default_dataset }}</option>
+                    {% for dataset in datasets %}
+                        <option value="{{ dataset.path }}">{{ dataset.path }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="conf">Confidence</label>
+                    <input id="conf" name="conf" class="form-control" type="number" step="0.001" value="0.001">
+                </div>
+                <div class="form-group">
+                    <label for="iou">Validation NMS IoU</label>
+                    <input id="iou" name="iou" class="form-control" type="number" step="0.05" value="0.6">
+                </div>
+                <div class="form-group">
+                    <label for="match_iou">Matched Box IoU</label>
+                    <input id="match_iou" name="match_iou" class="form-control" type="number" step="0.05" value="0.6">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="batch">Batch</label>
+                    <input id="batch" name="batch" class="form-control" type="number" value="8">
+                </div>
+                <div class="form-group">
+                    <label for="imgsz">Image Size</label>
+                    <input id="imgsz" name="imgsz" class="form-control" type="number" value="640">
+                </div>
+                <div class="form-group">
+                    <label for="split">Split</label>
+                    <select id="split" name="split" class="form-control">
+                        <option value="val">val</option>
+                        <option value="train">train</option>
+                    </select>
+                </div>
+            </div>
+            <button class="btn btn-primary" type="submit"><i class="fas fa-chart-column"></i> Run Evaluation</button>
+        </form>
+    </section>
+    <section class="panel">
+        <h2><i class="fas fa-circle-info"></i> What This Report Shows</h2>
+        <div class="feature-list">
+            <div class="mode-feature"><i class="fas fa-check"></i> Standard detection metrics: precision, recall, mAP50, mAP50-95.</div>
+            <div class="mode-feature"><i class="fas fa-check"></i> Fairness-first metrics: macro precision, macro recall, macro F1.</div>
+            <div class="mode-feature"><i class="fas fa-check"></i> Per-class support and prediction counts so dominant classes do not hide weak ones.</div>
+            <div class="mode-feature"><i class="fas fa-check"></i> Box-level matched IoU summary for detection analysis.</div>
+        </div>
+    </section>
+</div>
+
+<section class="panel">
+    <h2><i class="fas fa-clock"></i> Evaluation Jobs</h2>
+    <div class="table-wrapper">
+        <table>
+            <thead><tr><th>Label</th><th>Status</th><th>Created</th><th>Log</th></tr></thead>
+            <tbody>
+                {% for job in jobs %}
+                <tr>
+                    <td>{{ job.label }}</td>
+                    <td>{{ job.status }}</td>
+                    <td>{{ job.created_at }}</td>
+                    <td><a href="{{ url_for('admin_file', path=job.log_path) }}" target="_blank">Open Log</a></td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4">No evaluation jobs launched yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="panel">
+    <h2><i class="fas fa-file-lines"></i> Evaluation Reports</h2>
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Run</th>
+                    <th>mAP50</th>
+                    <th>Macro Recall</th>
+                    <th>Macro F1</th>
+                    <th>Macro IoU</th>
+                    <th>Open</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for report in reports %}
+                <tr>
+                    <td>{{ report.name }}</td>
+                    <td>{{ "%.4f"|format(report.summary.aggregate_metrics.mAP50) }}</td>
+                    <td>{{ "%.4f"|format(report.summary.aggregate_metrics.macro_recall) }}</td>
+                    <td>{{ "%.4f"|format(report.summary.aggregate_metrics.macro_f1) }}</td>
+                    <td>{{ "%.4f"|format(report.summary.aggregate_metrics.macro_iou) }}</td>
+                    <td>{% if report.report_html %}<a href="{{ url_for('admin_file', path=report.report_html) }}" target="_blank">Open HTML</a>{% else %}N/A{% endif %}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6">No reports found yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

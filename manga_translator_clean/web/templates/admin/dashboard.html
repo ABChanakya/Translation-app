@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - {{ product_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="fas fa-gauge-high"></i> Admin Dashboard</h1>
+    <p>Protected workspace for training, evaluation, assisted dataset generation, model inventory, and engine diagnostics.</p>
+</div>
+
+<div class="status-grid">
+    <div class="status-card">
+        <span>Default Detector</span>
+        <strong>{{ default_model }}</strong>
+    </div>
+    <div class="status-card">
+        <span>Canonical Dataset</span>
+        <strong>{{ default_dataset }}</strong>
+    </div>
+    <div class="status-card">
+        <span>Engine Registry</span>
+        <strong>{{ engine_statuses|length }} engines tracked</strong>
+    </div>
+    <div class="status-card">
+        <span>Recent Jobs</span>
+        <strong>{{ jobs|length }}</strong>
+    </div>
+</div>
+
+<div class="dashboard-grid">
+    <section class="panel">
+        <h2><i class="fas fa-rocket"></i> Quick Actions</h2>
+        <div class="feature-list">
+            <div class="mode-feature"><i class="fas fa-arrow-right"></i> Launch a new training job from the Training page.</div>
+            <div class="mode-feature"><i class="fas fa-arrow-right"></i> Run an evaluation and open the generated fairness report.</div>
+            <div class="mode-feature"><i class="fas fa-arrow-right"></i> Generate assisted labels from an older model and review them by whole image.</div>
+            <div class="mode-feature"><i class="fas fa-arrow-right"></i> Check which translation engines are fully enabled versus intentionally gated.</div>
+        </div>
+    </section>
+    <section class="panel">
+        <h2><i class="fas fa-plug"></i> Engine Status</h2>
+        <div class="table-wrapper compact-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Engine</th>
+                        <th>Status</th>
+                        <th>Reason</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for engine in engine_statuses %}
+                    <tr>
+                        <td>{{ engine.label }}</td>
+                        <td>{% if engine.enabled %}<span class="status-ok">Enabled</span>{% else %}<span class="status-warning">Disabled</span>{% endif %}</td>
+                        <td>{{ engine.disable_reason or "Ready" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+<div class="dashboard-grid">
+    <section class="panel">
+        <h2><i class="fas fa-clock"></i> Recent Jobs</h2>
+        <div class="table-wrapper compact-table">
+            <table>
+                <thead><tr><th>Type</th><th>Label</th><th>Status</th><th>Created</th></tr></thead>
+                <tbody>
+                    {% for job in jobs %}
+                    <tr>
+                        <td>{{ job.job_type }}</td>
+                        <td>{{ job.label }}</td>
+                        <td>{{ job.status }}</td>
+                        <td>{{ job.created_at }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="4">No admin jobs recorded yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+    <section class="panel">
+        <h2><i class="fas fa-database"></i> Assisted Data Runs</h2>
+        <div class="table-wrapper compact-table">
+            <table>
+                <thead><tr><th>Output</th><th>Items</th><th>Detector</th></tr></thead>
+                <tbody>
+                    {% for manifest in manifests %}
+                    <tr>
+                        <td>{{ manifest.output_dir or manifest._manifest_path }}</td>
+                        <td>{{ manifest._item_count }}</td>
+                        <td>{{ manifest.detector_model }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="3">No review manifests found yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+<section class="panel">
+    <h2><i class="fas fa-chart-line"></i> Recent Reports</h2>
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Run</th>
+                    <th>mAP50</th>
+                    <th>Macro Recall</th>
+                    <th>Macro F1</th>
+                    <th>Macro IoU</th>
+                    <th>Report</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for report in reports %}
+                <tr>
+                    <td>{{ report.name }}</td>
+                    <td>{{ "%.4f"|format(report.summary.aggregate_metrics.mAP50) }}</td>
+                    <td>{{ "%.4f"|format(report.summary.aggregate_metrics.macro_recall) }}</td>
+                    <td>{{ "%.4f"|format(report.summary.aggregate_metrics.macro_f1) }}</td>
+                    <td>{{ "%.4f"|format(report.summary.aggregate_metrics.macro_iou) }}</td>
+                    <td>
+                        {% if report.report_html %}
+                            <a class="btn btn-sm btn-primary" href="{{ url_for('admin_file', path=report.report_html) }}" target="_blank">Open</a>
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6">No evaluation reports generated yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

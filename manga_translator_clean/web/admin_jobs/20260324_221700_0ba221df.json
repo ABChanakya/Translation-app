@@ -1,0 +1,37 @@
+{
+  "job_id": "20260324_221700_0ba221df",
+  "job_type": "training",
+  "label": "Training via train_yolo",
+  "command": [
+    "/home/chanakya/chanakya/Translation_tool-2/.venv/bin/python",
+    "/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/training/train_yolo.py",
+    "--model",
+    "/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/models/checkpoints/custom_yolo_best.pt",
+    "--data",
+    "/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/training/datasets/custom_manga.yaml",
+    "--imgsz",
+    "640",
+    "--batch",
+    "32",
+    "--epochs",
+    "30",
+    "--device",
+    "0",
+    "--project",
+    "yolo_train_run"
+  ],
+  "metadata": {
+    "entrypoint": "train_yolo",
+    "model": "/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/models/checkpoints/custom_yolo_best.pt",
+    "data": "/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/training/datasets/custom_manga.yaml",
+    "device": "0"
+  },
+  "status": "failed",
+  "created_at": "2026-03-24T22:17:00.384343",
+  "manifest_path": "/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/web/admin_jobs/20260324_221700_0ba221df.json",
+  "log_path": "/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/web/admin_jobs/20260324_221700_0ba221df.log",
+  "cwd": "/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean",
+  "started_at": "2026-03-24T22:17:00.404673",
+  "finished_at": "2026-03-24T22:17:03.088637",
+  "return_code": 1
+}

@@ -1,0 +1,504 @@
+{
+  "timestamp": "2026-03-29T22:10:40.864256",
+  "total_pages": 12,
+  "processed": 12,
+  "failed": 0,
+  "pages": [
+    {
+      "index": 0,
+      "input": "/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/web/uploads/fd80eca7_0101.jpg",
+      "output": "/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/web/batch_outputs/batch_20260329_221040/translated_fd80eca7_0101.jpg",
+      "filename": "fd80eca7_0101.jpg",
+      "stats": {
+        "bubbles_detected": 2,
+        "regions_detected": 2,
+        "regions_by_type": {
+          "Dialogue": 2
+        },
+        "translations": [
+          {
+            "id": 1,
+            "type": "Dialogue",
+            "class_id": 0,
+            "original": "やはり名のある名匠の作品であるか？",
+            "translated": "Is this truly a work by a renowned master?",
+            "confidence": 0.44465991854667664
+          },
+          {
+            "id": 2,
+            "type": "Dialogue",
+            "class_id": 0,
+            "original": "欲の無い者だーー",
+            "translated": "That's just how people are, I suppose.",
+            "confidence": 0.3426119089126587
+          }
+        ],
+        "processing_time": "N/A"
+      }
+    },
+    {
+      "index": 1,
+      "input": "/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/web/uploads/ccbb41de_0102.jpg",
+      "output": "/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/web/batch_outputs/batch_20260329_221040/translated_ccbb41de_0102.jpg",
+      "filename": "ccbb41de_0102.jpg",
+      "stats": {
+        "bubbles_detected": 6,
+        "regions_detected": 6,
+        "regions_by_type": {
+          "Dialogue": 5,
+          "Sound Effects": 1
+        },
+        "translations": [
+          {
+            "id": 1,
+            "type": "Dialogue",
+            "class_id": 0,
+            "original": "ややはりロットル子爵の紹介で？",
+            "translated": "ややはりロットル子爵の紹介で？",
+            "confidence": 0.7206753492355347
+          },
+          {
+            "id": 2,
+            "type": "Dialogue",
+            "class_id": 0,
+            "original": "ななんと！",
+            "translated": "ななんと！",
+            "confidence": 0.5844423770904541
+          },
+          {
+            "id": 3,
+            "type": "Dialogue",
+            "class_id": 0,
+            "original": "真印！？",
+            "translated": "真印！？",
+            "confidence": 0.5037192702293396
+          },
+          {
+            "id": 4,
+            "type": "Dialogue",
+            "class_id": 0,
+            "original": "作らせるなんてやるじゃないかサトゥー殿！",
+            "translated": "作らせるなんてやるじゃないかサトゥー殿！",
+            "confidence": 0.4794360399246216
+          },
+          {
+            "id": 5,
+            "type": "Dialogue",
+            "class_id": 0,
+            "original": "どんな剣が見たいと太守達にせがまれたので来訪時に預けていた妖精剣をサロンに持ってきて貰う",
+            "translated": "どんな剣が見たいと太守達にせがまれたので来訪時に預けていた妖精剣をサロンに持ってきて貰う",
+            "confidence": 0.23650257289409637
+          },
+          {
+            "id": 6,
+            "type": "Sound Effects",
+            "class_id": 1,
+            "original": "どう",
+            "translated": "どう",
+            "confidence": 0.3189845383167267
+          }
+        ],
+        "processing_time": "N/A"
+      }
+    },
+    {
+      "index": 2,
+      "input": "/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/web/uploads/cd413204_0103.jpg",
+      "output": "/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/web/batch_outputs/batch_20260329_221040/translated_cd413204_0103.jpg",
+      "filename": "cd413204_0103.jpg",
+      "stats": {
+        "bubbles_detected": 5,
+        "regions_detected": 5,
+        "regions_by_type": {
+          "Dialogue": 4,
+          "Signs Labels": 1
+        },
+        "translations": [
+          {
+            "id": 1,
+            "type": "Dialogue",
+            "class_id": 0,
+            "original": "なんという美しい刃紋だ",
+            "translated": "なんという美しい刃紋だ",
+            "confidence": 0.7429385781288147
+          },
+          {
+            "id": 2,
+            "type": "Dialogue",
+            "class_id": 0,
+            "original": "この柄の細工も素晴らしい",
+            "translated": "この柄の細工も素晴らしい",
+            "confidence": 0.48926112055778503
+          },
+          {
+            "id": 3,
+            "type": "Dialogue",
+            "class_id": 0,
+            "original": "あの真印！",
+            "translated": "あの真印！",
+            "confidence": 0.30431225895881653
+          },
+          {
+            "id": 4,
+            "type": "Dialogue",
+            "class_id": 0,
+            "original": "変な相手には見せびらかさないようにしないと．．．",
+            "translated": "変な相手には見せびらかさないようにしないと．．．",
+            "confidence": 0.22911661863327026
+          },
+          {
+            "id": 5,
+            "type": "Signs Labels",
+            "class_id": 2,
+            "original": "「名刀の登場に騒然．．．。",
+            "translated": "「名刀の登場に騒然．．．。",
+            "confidence": 0.22324325144290924
+          }
+        ],
+        "processing_time": "N/A"
+      }
+    },
+    {
+      "index": 3,
+      "input": "/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/web/uploads/4aa5e220_0104.jpg",
+      "output": "/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/web/batch_outputs/batch_20260329_221040/translated_4aa5e220_0104.jpg",
+      "filename": "4aa5e220_0104.jpg",
+      "stats": {
+        "bubbles_detected": 2,
+        "regions_detected": 2,
+        "regions_by_type": {
+          "Dialogue": 2
+        },
+        "translations": [
+          {
+            "id": 1,
+            "type": "Dialogue",
+            "class_id": 0,
+            "original": "少し風に当たってきます",
+            "translated": "少し風に当たってきます",
+            "confidence": 0.7082831263542175
+          },
+          {
+            "id": 2,
+            "type": "Dialogue",
+            "class_id": 0,
+            "original": "サロンで談笑は続く",
+            "translated": "サロンで談笑は続く",
+            "confidence": 0.6254180073738098
+          }
+        ],
+        "processing_time": "N/A"
+      }
+    },
+    {
+      "index": 4,
+      "input": "/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/web/uploads/856b98ae_0105.jpg",
+      "output": "/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/web/batch_outputs/batch_20260329_221040/translated_856b98ae_0105.jpg",
+      "filename": "856b98ae_0105.jpg",
+      "stats": {
+        "bubbles_detected": 0,
+        "regions_detected": 0,
+        "regions_by_type": {},
+        "translations": [],
+        "processing_time": "N/A"
+      }
+    },
+    {
+      "index": 5,
+      "input": "/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/web/uploads/39dc8b27_0106.jpg",
+      "output": "/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/web/batch_outputs/batch_20260329_221040/translated_39dc8b27_0106.jpg",
+      "filename": "39dc8b27_0106.jpg",
+      "stats": {
+        "bubbles_detected": 1,
+        "regions_detected": 1,
+        "regions_by_type": {
+          "Dialogue": 1
+        },
+        "translations": [
+          {
+            "id": 1,
+            "type": "Dialogue",
+            "class_id": 0,
+            "original": "―妖精のようだ",
+            "translated": "―妖精のようだ",
+            "confidence": 0.36173015832901
+          }
+        ],
+        "processing_time": "N/A"
+      }
+    },
+    {
+      "index": 6,
+      "input": "/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/web/uploads/a2856e2f_0107.jpg",
+      "output": "/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/web/batch_outputs/batch_20260329_221040/translated_a2856e2f_0107.jpg",
+      "filename": "a2856e2f_0107.jpg",
+      "stats": {
+        "bubbles_detected": 6,
+        "regions_detected": 6,
+        "regions_by_type": {
+          "Dialogue": 6
+        },
+        "translations": [
+          {
+            "id": 1,
+            "type": "Dialogue",
+            "class_id": 0,
+            "original": "えぇ喜んでお供いたします",
+            "translated": "えぇ喜んでお供いたします",
+            "confidence": 0.9086620211601257
+          },
+          {
+            "id": 2,
+            "type": "Dialogue",
+            "class_id": 0,
+            "original": "こんばんはセーラ様先ほどの失言はお忘れください",
+            "translated": "こんばんはセーラ様先ほどの失言はお忘れください",
+            "confidence": 0.5221262574195862
+          },
+          {
+            "id": 3,
+            "type": "Dialogue",
+            "class_id": 0,
+            "original": "忘れてあげません",
+            "translated": "忘れてあげません",
+            "confidence": 0.4718025028705597
+          },
+          {
+            "id": 4,
+            "type": "Dialogue",
+            "class_id": 0,
+            "original": "ペンドラゴン卿ったら．．．",
+            "translated": "ペンドラゴン卿ったら．．．",
+            "confidence": 0.4267323911190033
+          },
+          {
+            "id": 5,
+            "type": "Dialogue",
+            "class_id": 0,
+            "original": "まぁ、",
+            "translated": "まぁ、",
+            "confidence": 0.27319419384002686
+          },
+          {
+            "id": 6,
+            "type": "Dialogue",
+            "class_id": 0,
+            "original": "サトゥーさんお庭を散歩しませんか？",
+            "translated": "サトゥーさんお庭を散歩しませんか？",
+            "confidence": 0.25450843572616577
+          }
+        ],
+        "processing_time": "N/A"
+      }
+    },
+    {
+      "index": 7,
+      "input": "/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/web/uploads/ba11c76b_0108.jpg",
+      "output": "/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/web/batch_outputs/batch_20260329_221040/translated_ba11c76b_0108.jpg",
+      "filename": "ba11c76b_0108.jpg",
+      "stats": {
+        "bubbles_detected": 4,
+        "regions_detected": 4,
+        "regions_by_type": {
+          "Dialogue": 4
+        },
+        "translations": [
+          {
+            "id": 1,
+            "type": "Dialogue",
+            "class_id": 0,
+            "original": "綺麗ですね",
+            "translated": "綺麗ですね",
+            "confidence": 0.886428952217102
+          },
+          {
+            "id": 2,
+            "type": "Dialogue",
+            "class_id": 0,
+            "original": "（ねぇ",
+            "translated": "（ねぇ",
+            "confidence": 0.7338047623634338
+          },
+          {
+            "id": 3,
+            "type": "Dialogue",
+            "class_id": 0,
+            "original": "ぁ蛍",
+            "translated": "ぁ蛍",
+            "confidence": 0.35159409046173096
+          },
+          {
+            "id": 4,
+            "type": "Dialogue",
+            "class_id": 0,
+            "original": "あ、サトゥーさん．．．",
+            "translated": "あ、サトゥーさん．．．",
+            "confidence": 0.3087666928768158
+          }
+        ],
+        "processing_time": "N/A"
+      }
+    },
+    {
+      "index": 8,
+      "input": "/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/web/uploads/5c1b913f_0109.jpg",
+      "output": "/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/web/batch_outputs/batch_20260329_221040/translated_5c1b913f_0109.jpg",
+      "filename": "5c1b913f_0109.jpg",
+      "stats": {
+        "bubbles_detected": 4,
+        "regions_detected": 4,
+        "regions_by_type": {
+          "Dialogue": 4
+        },
+        "translations": [
+          {
+            "id": 1,
+            "type": "Dialogue",
+            "class_id": 0,
+            "original": "ここは当たり降りのないポジティブな答えを．．．",
+            "translated": "ここは当たり降りのないポジティブな答えを．．．",
+            "confidence": 0.5265405774116516
+          },
+          {
+            "id": 2,
+            "type": "Dialogue",
+            "class_id": 0,
+            "original": "サトゥーさんは．．．",
+            "translated": "サトゥーさんは．．．",
+            "confidence": 0.3948240876197815
+          },
+          {
+            "id": 3,
+            "type": "Dialogue",
+            "class_id": 0,
+            "original": "運命を変えられると思いますか？",
+            "translated": "運命を変えられると思いますか？",
+            "confidence": 0.2760707437992096
+          },
+          {
+            "id": 4,
+            "type": "Dialogue",
+            "class_id": 0,
+            "original": "もちろんです",
+            "translated": "もちろんです",
+            "confidence": 0.22660274803638458
+          }
+        ],
+        "processing_time": "N/A"
+      }
+    },
+    {
+      "index": 9,
+      "input": "/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/web/uploads/7cce8ee6_0110.jpg",
+      "output": "/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/web/batch_outputs/batch_20260329_221040/translated_7cce8ee6_0110.jpg",
+      "filename": "7cce8ee6_0110.jpg",
+      "stats": {
+        "bubbles_detected": 3,
+        "regions_detected": 3,
+        "regions_by_type": {
+          "Dialogue": 3
+        },
+        "translations": [
+          {
+            "id": 1,
+            "type": "Dialogue",
+            "class_id": 0,
+            "original": "本当に．．．",
+            "translated": "本当に．．．",
+            "confidence": 0.649792492389679
+          },
+          {
+            "id": 2,
+            "type": "Dialogue",
+            "class_id": 0,
+            "original": "魔王に殺されそうになっても？",
+            "translated": "魔王に殺されそうになっても？",
+            "confidence": 0.49452850222587585
+          },
+          {
+            "id": 3,
+            "type": "Dialogue",
+            "class_id": 0,
+            "original": "本当に．．．そう思いますか？",
+            "translated": "本当に．．．そう思いますか？",
+            "confidence": 0.335693895816803
+          }
+        ],
+        "processing_time": "N/A"
+      }
+    },
+    {
+      "index": 10,
+      "input": "/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/web/uploads/ac8c16ba_0111.jpg",
+      "output": "/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/web/batch_outputs/batch_20260329_221040/translated_ac8c16ba_0111.jpg",
+      "filename": "ac8c16ba_0111.jpg",
+      "stats": {
+        "bubbles_detected": 3,
+        "regions_detected": 3,
+        "regions_by_type": {
+          "Dialogue": 3
+        },
+        "translations": [
+          {
+            "id": 1,
+            "type": "Dialogue",
+            "class_id": 0,
+            "original": "どうぞ",
+            "translated": "どうぞ",
+            "confidence": 0.4831925928592682
+          },
+          {
+            "id": 2,
+            "type": "Dialogue",
+            "class_id": 0,
+            "original": "サトゥーさんがいて良かった",
+            "translated": "サトゥーさんがいて良かった",
+            "confidence": 0.3089960217475891
+          },
+          {
+            "id": 3,
+            "type": "Dialogue",
+            "class_id": 0,
+            "original": "魔王なんてサクサクと退治しちゃいますよ",
+            "translated": "魔王なんてサクサクと退治しちゃいますよ",
+            "confidence": 0.23998121917247772
+          }
+        ],
+        "processing_time": "N/A"
+      }
+    },
+    {
+      "index": 11,
+      "input": "/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/web/uploads/1e120390_0112.jpg",
+      "output": "/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/web/batch_outputs/batch_20260329_221040/translated_1e120390_0112.jpg",
+      "filename": "1e120390_0112.jpg",
+      "stats": {
+        "bubbles_detected": 1,
+        "regions_detected": 1,
+        "regions_by_type": {
+          "Dialogue": 1
+        },
+        "translations": [
+          {
+            "id": 1,
+            "type": "Dialogue",
+            "class_id": 0,
+            "original": "いけない",
+            "translated": "いけない",
+            "confidence": 0.6530947089195251
+          }
+        ],
+        "processing_time": "N/A"
+      }
+    }
+  ],
+  "errors": [],
+  "chunks": [
+    {
+      "chunk_index": 1,
+      "start_index": 0,
+      "count": 12
+    }
+  ],
+  "story_context": "Death March to the Parallel World Rhapsody — System Prompt Reference\nStory Overview\nIchiro Suzuki, a chronically overworked game developer, takes a nap at his desk and wakes up inside a fantasy world resembling the MMORPG he had been debugging. TV Tropes He finds himself in a young teenager's body going by the name Satou. After accidentally wiping out an army with a one-time-use spell, he reaches an absurdly high level — and then chooses to spend his days as a laid-back traveling merchant, getting pulled into adventures along the way. The tone is slice-of-life meets isekai fantasy, low-stakes most of the time, with Satou quietly solving problems without drawing attention to his true power.\n\nMain Characters\nSatou (Ichiro Suzuki)\nA 29-year-old programmer reborn into a 15-year-old's body. He is genre-savvy thanks to his background as a game developer, often predicting what will happen next — except when it comes to romance. TV Tropes Calm, resourceful, and kind-hearted. Hides his overwhelming power and prefers sightseeing and food tourism over conflict. His establishing moment is stopping to help a lost little girl. TV Tropes\nArisa\nAn 11-year-old fallen princess who was enslaved after her country was invaded. Satou bought her after discovering she understands Japanese Wikipedia, making her his most trusted confidante about his true origins. Cunning, bold, and openly infatuated with Satou. She acts as his inside advisor on the world's politics and customs.\nLulu\nArisa's quiet, gentle older sister. Also a former slave. More domestic and soft-spoken than Arisa — she eventually becomes the party's best cook. Loyal and warm.\nLiza\nAn 18-year-old lizardkin demi-human who looked after Pochi and Tama while they were all enslaved. Wikipedia Satou's trusted frontline fighter and backup leader, she wields a spear and acts as the team mom to the younger party members. TV Tropes Disciplined, loyal, and deeply devoted to Satou.\nPochi\nA dog demi-human child slave who receives her name from Satou. Very childlike, with a huge obsession with meat — she and Tama mirror each other closely in personality. The Outerhaven Energetic and innocent.\nTama\nA cat demi-human child who looks like a normal child but with cat ears and a tail. Fandom Whimsical, often falls asleep at random, and is actually the most combat-skilled of Satou's companions. Fandom Inseparable from Pochi; treats her like a little sister.\nMia\nA small, quiet elf princess who speaks in very short sentences. Ancient by elf standards but appears child-sized. Reserved and calm, with powerful nature magic.\nNana\nA homunculus who has the appearance of an older teenager. She is straightforward and literal, with limited emotional expression, but tries to be cute — especially around fluffy things. The Outerhaven Acts as the party's tank in combat.\nZena\nA soldier in the city's territorial army. Wikipedia The first person Satou befriends in the new world. Earnest, kind, and hardworking — she has feelings for Satou but their paths diverge as he keeps traveling.\n\nKey Dynamics\n\nSatou is the unspoken \"team dad\" — protective, provider, quietly godlike in power\nLiza is the responsible older sibling figure\nArisa is the scheming insider who knows Satou's secret\nPochi & Tama are the comic relief duo, obsessed with food\nThe group functions like a found family traveling through a fantasy world"
+}

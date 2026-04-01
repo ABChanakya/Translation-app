@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}Training - {{ product_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="fas fa-dumbbell"></i> Admin Training</h1>
+    <p>Launch real training runs from the canonical scripts and keep the generated reports easy to open for a demo.</p>
+</div>
+
+<div class="dashboard-grid">
+    <section class="panel">
+        <h2><i class="fas fa-play"></i> Launch Training</h2>
+        <form method="post" action="{{ url_for('admin_launch_training') }}" class="admin-form">
+            <div class="form-group">
+                <label for="entrypoint">Training Flow</label>
+                <select id="entrypoint" name="entrypoint" class="form-control">
+                    <option value="train_yolo">Basic Training</option>
+                    <option value="advanced_train_yolo">Two-Stage Training</option>
+                    <option value="train_and_eval">Three-Stage Train + Evaluate</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="model">Base Model</label>
+                <select id="model" name="model" class="form-control">
+                    <option value="{{ default_model }}">{{ default_model }}</option>
+                    {% for model in models %}
+                        <option value="{{ model.path }}">{{ model.path }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="data">Dataset YAML</label>
+                <select id="data" name="data" class="form-control">
+                    <option value="{{ default_dataset }}">{{ default_dataset }}</option>
+                    {% for dataset in datasets %}
+                        <option value="{{ dataset.path }}">{{ dataset.path }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="epochs">Epochs</label>
+                    <input id="epochs" name="epochs" class="form-control" type="number" value="30">
+                </div>
+                <div class="form-group">
+                    <label for="batch_size">Batch Size</label>
+                    <input id="batch_size" name="batch_size" class="form-control" type="number" value="8">
+                </div>
+                <div class="form-group">
+                    <label for="imgsz">Image Size</label>
+                    <input id="imgsz" name="imgsz" class="form-control" type="number" value="640">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="device">Device</label>
+                    <input id="device" name="device" class="form-control" value="cpu" placeholder="cpu, gpu, 0, 0,1">
+                </div>
+                <div class="form-group">
+                    <label for="project">Project Dir</label>
+                    <input id="project" name="project" class="form-control" value="yolo_train_run">
+                </div>
+                <div class="form-group">
+                    <label for="match_iou">Matched Box IoU</label>
+                    <input id="match_iou" name="match_iou" class="form-control" type="number" step="0.05" value="0.6">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="head_epochs">Head Epochs</label>
+                    <input id="head_epochs" name="head_epochs" class="form-control" type="number" value="10">
+                </div>
+                <div class="form-group">
+                    <label for="full_epochs">Full Epochs</label>
+                    <input id="full_epochs" name="full_epochs" class="form-control" type="number" value="30">
+                </div>
+                <div class="form-group">
+                    <label for="no_mosaic_epochs">No-Mosaic Epochs</label>
+                    <input id="no_mosaic_epochs" name="no_mosaic_epochs" class="form-control" type="number" value="8">
+                </div>
+            </div>
+            <button class="btn btn-primary" type="submit"><i class="fas fa-rocket"></i> Launch Training Job</button>
+        </form>
+    </section>
+    <section class="panel">
+        <h2><i class="fas fa-circle-info"></i> Notes</h2>
+        <div class="feature-list">
+            <div class="mode-feature"><i class="fas fa-check"></i> The canonical dataset defaults to the 5-class workflow.</div>
+            <div class="mode-feature"><i class="fas fa-check"></i> Evaluation reports include macro and per-class metrics so rare classes stay visible.</div>
+            <div class="mode-feature"><i class="fas fa-check"></i> Jobs are launched in the background and logged under <code>web/admin_jobs</code>.</div>
+            <div class="mode-feature"><i class="fas fa-check"></i> Device accepts <code>cpu</code>, <code>gpu</code>, or CUDA ids like <code>0</code>; <code>gpu</code> falls back to <code>cpu</code> if CUDA is unavailable.</div>
+        </div>
+    </section>
+</div>
+
+<section class="panel">
+    <h2><i class="fas fa-clock"></i> Recent Training / Evaluation Jobs</h2>
+    <div class="table-wrapper">
+        <table>
+            <thead><tr><th>Type</th><th>Label</th><th>Status</th><th>Log</th></tr></thead>
+            <tbody>
+                {% for job in jobs %}
+                <tr>
+                    <td>{{ job.job_type }}</td>
+                    <td>{{ job.label }}</td>
+                    <td>{{ job.status }}</td>
+                    <td><a href="{{ url_for('admin_file', path=job.log_path) }}" target="_blank">Open Log</a></td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4">No jobs launched yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="panel">
+    <h2><i class="fas fa-chart-column"></i> Generated Reports</h2>
+    <div class="table-wrapper">
+        <table>
+            <thead><tr><th>Run</th><th>mAP50</th><th>Macro F1</th><th>Macro IoU</th><th>Report</th></tr></thead>
+            <tbody>
+                {% for report in reports %}
+                <tr>
+                    <td>{{ report.name }}</td>
+                    <td>{{ "%.4f"|format(report.summary.aggregate_metrics.mAP50) }}</td>
+                    <td>{{ "%.4f"|format(report.summary.aggregate_metrics.macro_f1) }}</td>
+                    <td>{{ "%.4f"|format(report.summary.aggregate_metrics.macro_iou) }}</td>
+                    <td>{% if report.report_html %}<a href="{{ url_for('admin_file', path=report.report_html) }}" target="_blank">Open HTML</a>{% else %}N/A{% endif %}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5">No reports yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

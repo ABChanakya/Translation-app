@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage*
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+*/.venv/
+*/venv/
+*/env/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Logs and runtime artifacts
+*.log
+*.pid
+
+# Build / distribution
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Project outputs and large/generated assets
+manga_translator_clean/batch_outputs/
+manga_translator_clean/evaluation/results/
+manga_translator_clean/data/processed/
+manga_translator_clean/data/raw/
+manga_translator_clean/data/training_data/
+manga_translator_clean/data/pseudo_labels/
+manga_translator_clean/data/manga_chapters/
+manga_translator_clean/models/checkpoints/
+manga_translator_clean/models/exported/
+manga_translator_clean/yolo_train_run/
+
+# Local services and model artifacts
+manga_translator_clean/lama_service/venv_lama/
+manga_translator_clean/colorization/*.pth
+manga_translator_clean/*.pt

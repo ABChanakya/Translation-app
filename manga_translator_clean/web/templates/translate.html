@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+
+{% block title %}Translate - {{ product_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="fas fa-language"></i> Manga Translation</h1>
+    <p>Translate a single page or run a chunked batch workflow without exposing training controls in the public UI.</p>
+    <div class="mode-toggle" style="margin-top: 15px;">
+        <button class="btn btn-primary" id="singleModeBtn" onclick="switchMode('single')">
+            <i class="fas fa-file-image"></i> Single Page
+        </button>
+        <button class="btn btn-outline-primary" id="batchModeBtn" onclick="switchMode('batch')">
+            <i class="fas fa-layer-group"></i> Batch Processing
+        </button>
+    </div>
+    <p class="helper-text">Advanced training, evaluation, and assisted labeling tools live in the protected admin workspace.</p>
+</div>
+
+<div class="translation-container" data-initial-mode="{{ initial_mode }}">
+    <div id="singleMode">
+        <div class="upload-section">
+            <div class="upload-box" id="uploadBox">
+                <i class="fas fa-cloud-upload-alt fa-3x"></i>
+                <p>Drag and drop one manga page here or click to browse</p>
+                <input type="file" id="fileInput" accept="image/*" hidden>
+                <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                    <i class="fas fa-folder-open"></i> Choose File
+                </button>
+            </div>
+            <div class="preview-section" id="previewSection" style="display: none;">
+                <img id="previewImage" alt="Preview">
+                <button class="btn btn-secondary" onclick="clearUpload()">
+                    <i class="fas fa-times"></i> Clear
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="batchMode" style="display: none;">
+        <div class="upload-section">
+            <div class="upload-box" id="batchUploadBox">
+                <i class="fas fa-cloud-upload-alt fa-3x"></i>
+                <p>Upload multiple manga pages. The server processes them in smaller chunks to stay more memory-friendly.</p>
+                <input type="file" id="batchFileInput" accept="image/*" multiple hidden>
+                <button class="btn btn-primary" onclick="document.getElementById('batchFileInput').click()">
+                    <i class="fas fa-folder-open"></i> Choose Multiple Files
+                </button>
+                <p class="helper-text">Recommended for chapter demos and larger runs.</p>
+            </div>
+            <div id="batchPreviewSection" style="display: none;">
+                <h4>Selected Files (<span id="batchFileCount">0</span>)</h4>
+                <div id="batchFileList" class="batch-file-list"></div>
+                <button class="btn btn-secondary" onclick="clearBatchUpload()">
+                    <i class="fas fa-times"></i> Clear All
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="options-section">
+        <h3>Translation Options</h3>
+        <div class="status-chip" id="engineStatusChip">Loading translation engines...</div>
+        <div class="form-group">
+            <label for="translator">Translation Engine:</label>
+            <select id="translator" class="form-control"></select>
+            <small id="engineAvailabilityNote">Only currently enabled engines are shown here. The admin area lists disabled engines and setup requirements.</small>
+        </div>
+        <div class="form-group">
+            <label for="targetLang">Target Language:</label>
+            <select id="targetLang" class="form-control">
+                <option value="en">English</option>
+                <option value="es">Spanish</option>
+                <option value="fr">French</option>
+                <option value="de">German</option>
+                <option value="it">Italian</option>
+                <option value="pt">Portuguese</option>
+                <option value="ru">Russian</option>
+                <option value="zh-CN">Chinese (Simplified)</option>
+                <option value="ko">Korean</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="confidence">Detection Confidence: <span id="confidenceValue">0.10</span></label>
+            <input type="range" id="confidence" class="form-control" min="0.01" max="0.50" step="0.01" value="0.10">
+            <small>Lower catches more candidate regions. For noisy pages, keep it around 0.08-0.15.</small>
+        </div>
+        <div class="form-group">
+            <label for="iouThreshold">NMS IoU Threshold: <span id="iouValue">0.55</span></label>
+            <input type="range" id="iouThreshold" class="form-control" min="0.30" max="0.70" step="0.05" value="0.55">
+            <small>The public translation default stays at 0.55 for duplicate suppression on manga page layouts.</small>
+        </div>
+        <div id="batchOptions" style="display: none;">
+            <div class="form-group">
+                <label for="outputFormat">Output Format:</label>
+                <select id="outputFormat" class="form-control">
+                    <option value="zip">ZIP Archive</option>
+                    <option value="pdf">PDF Document</option>
+                    <option value="both">Both (ZIP + PDF)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="chunkSize">Batch Chunk Size:</label>
+                <select id="chunkSize" class="form-control">
+                    <option value="4">4 pages</option>
+                    <option value="8" selected>8 pages</option>
+                    <option value="12">12 pages</option>
+                </select>
+                <small>Lower chunk sizes reduce RAM pressure for larger uploads.</small>
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="includeOriginals" checked>
+                    Include original images
+                </label>
+            </div>
+        </div>
+
+        <div class="story-context-panel">
+            <button type="button" class="story-context-toggle" id="storyContextToggle" aria-expanded="false" aria-controls="storyContextBody">
+                <span class="story-context-toggle-left">
+                    <i class="fas fa-book"></i>
+                    <span>Global Story Context</span>
+                    <span class="story-context-badge" id="storyContextBadge" style="display:none;">active</span>
+                </span>
+                <i class="fas fa-chevron-down story-context-chevron" id="storyContextChevron"></i>
+            </button>
+            <div class="story-context-body" id="storyContextBody" hidden>
+                <p class="story-context-description">
+                    Give the translator background knowledge so character names, terms, and tone stay consistent across every page.
+                    Only used by the <strong>Gemma3</strong> engine.
+                </p>
+                <div class="story-context-columns">
+                    <div class="story-context-hints">
+                        <p><strong>What to include:</strong></p>
+                        <ul>
+                            <li><strong>Characters</strong> — Japanese name → English name, brief role</li>
+                            <li><strong>Setting</strong> — world, era, tone</li>
+                            <li><strong>Key terms</strong> — recurring words with preferred translations</li>
+                            <li><strong>Style notes</strong> — casual dialogue, formal narration, etc.</li>
+                        </ul>
+                    </div>
+                    <div class="story-context-example">
+                        <p><strong>Example:</strong></p>
+                        <pre class="story-context-pre">Characters:
+- 太郎 (Taro) → protagonist, energetic
+- 麗子 (Reiko) → mentor, calm
+
+Setting: feudal fantasy Japan
+
+Key terms:
+- 魔法 → magic
+- 使い魔 → familiar
+
+Tone: casual dialogue, poetic narration</pre>
+                    </div>
+                </div>
+                <textarea
+                    id="storyContext"
+                    class="form-control"
+                    rows="6"
+                    placeholder="Paste your story context here…"
+                ></textarea>
+                <small>Leave blank to translate without additional context.</small>
+            </div>
+        </div>
+        <button class="btn btn-success btn-lg" id="translateBtn" onclick="translateImage()" disabled>
+            <i class="fas fa-language"></i> <span id="translateBtnText">Translate</span>
+        </button>
+    </div>
+
+    <div class="progress-section" id="progressSection" style="display: none;">
+        <div class="progress-stages">
+            <div class="stage" id="stage-uploading"><i class="fas fa-upload"></i><span>Upload</span></div>
+            <div class="stage" id="stage-detecting"><i class="fas fa-search"></i><span>Detect</span></div>
+            <div class="stage" id="stage-ocr"><i class="fas fa-font"></i><span>OCR</span></div>
+            <div class="stage" id="stage-translating"><i class="fas fa-language"></i><span>Translate</span></div>
+            <div class="stage" id="stage-inpainting"><i class="fas fa-paint-brush"></i><span>Inpaint</span></div>
+            <div class="stage" id="stage-rendering"><i class="fas fa-image"></i><span>Render</span></div>
+        </div>
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <p id="progressText">Processing...</p>
+    </div>
+
+    <div class="results-section" id="resultsSection" style="display: none;">
+        <h3>Translation Results</h3>
+        <div class="view-mode-toggle" style="margin-bottom: 20px; text-align: center;">
+            <button class="btn btn-sm btn-primary" id="viewComparisonBtn" onclick="switchViewMode('comparison')">
+                <i class="fas fa-sliders-h"></i> Comparison Slider
+            </button>
+            <button class="btn btn-sm btn-outline-primary" id="viewSideBySideBtn" onclick="switchViewMode('sidebyside')">
+                <i class="fas fa-columns"></i> Side by Side
+            </button>
+        </div>
+        <div id="comparisonView" class="comparison-container">
+            <img-comparison-slider>
+                <img slot="first" id="comparisonOriginal" alt="Original">
+                <img slot="second" id="comparisonTranslated" alt="Translated">
+            </img-comparison-slider>
+        </div>
+        <div id="sideBySideView" class="results-grid" style="display: none;">
+            <div class="result-item">
+                <h4>Original</h4>
+                <img id="originalImage" alt="Original">
+            </div>
+            <div class="result-item">
+                <h4>Translated</h4>
+                <img id="translatedImage" alt="Translated">
+                <button class="btn btn-primary" onclick="downloadResult()">
+                    <i class="fas fa-download"></i> Download
+                </button>
+            </div>
+        </div>
+        <div class="stats-box" id="statsBox"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/translate.js') }}"></script>
+{% endblock %}
