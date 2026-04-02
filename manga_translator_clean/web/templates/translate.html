@@ -164,6 +164,21 @@ Tone: casual dialogue, poetic narration</pre>
                 <small>Leave blank to translate without additional context.</small>
             </div>
         </div>
+
+        <div class="form-group" style="margin-top: 12px;">
+            <label style="display:flex; align-items:center; gap:10px; cursor:pointer; font-weight:normal;">
+                <input type="checkbox" id="vlmContext" style="width:16px; height:16px;">
+                <span>
+                    <strong>Visual context</strong>
+                    <small style="display:block; color:#888; font-size:0.82em;">
+                        Sends the page image to Gemma3 vision (+1 LLM call/page) to describe the scene
+                        (mood, characters, emotion) — improves translation accuracy on context-heavy pages.
+                        Requires a vision-capable model (gemma3:12b or translategemma:12b).
+                    </small>
+                </span>
+            </label>
+        </div>
+
         <button class="btn btn-success btn-lg" id="translateBtn" onclick="translateImage()" disabled>
             <i class="fas fa-language"></i> <span id="translateBtnText">Translate</span>
         </button>

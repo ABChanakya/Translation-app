@@ -9,6 +9,13 @@ from config.settings import GEMMA_MODEL, GEMMA_KEEP_ALIVE
 class GemmaTranslator(BaseTranslator):
     """Translator using Gemma3 LLM via Ollama"""
 
+    _MAX_STORY_CONTEXT_CHARS = 1200
+    _MAX_PAGE_CONTEXT_CHARS = 1200
+
+    def __init__(self, source_lang: str, target_lang: str, model: str = None):
+        super().__init__(source_lang, target_lang)
+        self.model = model or GEMMA_MODEL
+
     @staticmethod
     def _get_client():
         try:
@@ -20,6 +27,13 @@ class GemmaTranslator(BaseTranslator):
     @property
     def name(self) -> str:
         return "Gemma3"
+
+    @staticmethod
+    def _trim_context(text: str, limit: int) -> str:
+        text = (text or "").strip()
+        if len(text) <= limit:
+            return text
+        return text[:limit] + "…"
     
     def translate(self, text: str, context_prompt: str = "", story_context: str = "") -> str:
         """
@@ -45,21 +59,30 @@ class GemmaTranslator(BaseTranslator):
             f"cultural context. Output ONLY the translated text, nothing else."
         )
         
-        # Add story context to system prompt for consistency across all pages.
-        # Cap at 1200 chars so the story context never dominates the context window.
+        # Add story context and page context to system prompt.
+        # Keeping all context in the system message prevents Gemma from treating
+        # it as part of the text to translate (which causes it to repeat context).
         if story_context:
-            ctx = story_context[:1200] + ("…" if len(story_context) > 1200 else "")
-            system_prompt += f"\n\n[Story Context for Translation Consistency]\n{ctx}"
-        
-        # Include narrative context if available
-        context_part = ""
+            ctx = self._trim_context(story_context, self._MAX_STORY_CONTEXT_CHARS)
+            system_prompt += (
+                "\n\n[Story Context — Reference Only]"
+                "\nUse this only to keep terminology/character consistency."
+                "\nDo NOT copy, continue, or paraphrase this section in the output."
+                f"\n<story_context>\n{ctx}\n</story_context>"
+            )
         if context_prompt:
-            context_part = f"\n{context_prompt}"
-        
+            ctx = self._trim_context(context_prompt, self._MAX_PAGE_CONTEXT_CHARS)
+            system_prompt += (
+                "\n\n[Previous Page Context — Reference Only]"
+                "\nUse only for disambiguation (names, pronouns, tone)."
+                "\nDo NOT continue this text. Do NOT include any part of it in output."
+                f"\n<previous_page_context>\n{ctx}\n</previous_page_context>"
+            )
+
         user_prompt = (
-            f"=== {self.source_lang.upper()} TEXT ==={context_part}\n"
-            f"{text}\n"
-            f"=== END TEXT ==="
+            "Translate exactly one text segment."
+            "\nReturn only the translated segment, with no quotes, labels, or extra lines."
+            f"\n\n=== {self.source_lang.upper()} TEXT ===\n{text}\n=== END TEXT ==="
         )
         
         messages = [
@@ -70,7 +93,7 @@ class GemmaTranslator(BaseTranslator):
         try:
             ollama = self._get_client()
             response = ollama.chat(
-                model=GEMMA_MODEL,
+                model=self.model,
                 messages=messages,
                 keep_alive=GEMMA_KEEP_ALIVE,
                 format='',  # Plain text
@@ -111,16 +134,36 @@ class GemmaTranslator(BaseTranslator):
             f"Format exactly as:\n1. <translation>\n2. <translation>\netc."
         )
         if story_context:
-            ctx = story_context[:1200] + ("…" if len(story_context) > 1200 else "")
-            system_prompt += f"\n\n[Story Context]\n{ctx}"
+            ctx = self._trim_context(story_context, self._MAX_STORY_CONTEXT_CHARS)
+            system_prompt += (
+                "\n\n[Story Context — Reference Only]"
+                "\nUse this only to keep terminology/character consistency."
+                "\nDo NOT copy, continue, or paraphrase this section in output."
+                f"\n<story_context>\n{ctx}\n</story_context>"
+            )
+        # Context goes in system prompt so Gemma treats it as background, not as
+        # text to continue — putting it in the user message causes Gemma to repeat it.
+        if context_prompt:
+            ctx = self._trim_context(context_prompt, self._MAX_PAGE_CONTEXT_CHARS)
+            system_prompt += (
+                "\n\n[Previous Page Context — Reference Only]"
+                "\nUse only for disambiguation (names, pronouns, tone)."
+                "\nDo NOT continue this text. Do NOT include any part of it in output."
+                f"\n<previous_page_context>\n{ctx}\n</previous_page_context>"
+            )
 
         numbered = "\n".join(f"{i+1}. {t}" for i, t in enumerate(texts))
-        user_prompt = f"{context_prompt}\n{numbered}" if context_prompt else numbered
+        user_prompt = (
+            "Translate each numbered source text independently."
+            "\nReturn only numbered translations for the given items."
+            "\nDo not add commentary and do not continue any context text."
+            f"\n\n{numbered}"
+        )
 
         try:
             ollama = self._get_client()
             response = ollama.chat(
-                model=GEMMA_MODEL,
+                model=self.model,
                 messages=[
                     {'role': 'system', 'content': system_prompt},
                     {'role': 'user',   'content': user_prompt},
@@ -140,7 +183,14 @@ class GemmaTranslator(BaseTranslator):
             return self._parse_numbered(raw, texts)
         except Exception as e:
             print(f"⚠️ Gemma3 batch translation failed ({type(e).__name__}): {e} — falling back to per-item")
-            return [self.translate(t, context_prompt=context_prompt, story_context=story_context) for t in texts]
+            results = []
+            for t in texts:
+                try:
+                    results.append(self.translate(t, context_prompt=context_prompt, story_context=story_context))
+                except Exception as item_err:
+                    print(f"   ⚠️ Per-item translation failed: {item_err}")
+                    results.append(t)  # keep original on failure
+            return results
 
     @staticmethod
     def _parse_numbered(raw: str, originals: list) -> list:
@@ -158,6 +208,16 @@ class GemmaTranslator(BaseTranslator):
         for i, orig in enumerate(originals):
             out.append(results.get(i, orig))
         return out
+
+    def unload(self) -> None:
+        """Tell Ollama to evict this model from VRAM so inpainting can use the GPU."""
+        try:
+            ollama = self._get_client()
+            # keep_alive=0 unloads the model immediately after the (empty) response
+            ollama.generate(model=self.model, prompt="", keep_alive=0)
+            print(f"   🧹 Unloaded {self.model} from GPU VRAM")
+        except Exception as e:
+            print(f"   ⚠️  Ollama unload skipped: {e}")
 
     def is_available(self) -> bool:
         """Check if Ollama and Gemma3 are available"""

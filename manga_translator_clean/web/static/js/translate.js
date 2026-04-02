@@ -306,6 +306,7 @@ async function translateImage() {
             confidence: confidence,
             iou_threshold: iouThreshold,
             story_context: storyContext,
+            vlm_context: document.getElementById('vlmContext')?.checked ?? false,
             session_id: sessionId
         });
 
@@ -511,6 +512,15 @@ function showBatchResults(result) {
         `;
     }
 
+    const retranslateBtn = result.batch_id ? `
+        <div style="margin-top:1rem">
+            <button class="btn btn-secondary" onclick="retranslateBatch('${result.batch_id}')">
+                <i class="fas fa-redo"></i> Retry Translation (skip OCR)
+            </button>
+            <span class="helper-text" style="margin-left:.5rem">Re-runs only the translation step using saved OCR text</span>
+        </div>
+    ` : '';
+
     statsBox.innerHTML = `
         <h4>Batch Processing Results</h4>
         <p><strong>Total Pages:</strong> ${result.total}</p>
@@ -518,9 +528,41 @@ function showBatchResults(result) {
         <p><strong>Failed:</strong> ${result.failed}</p>
         <p><strong>Chunk Size:</strong> ${result.chunk_size}</p>
         ${downloadsHtml}
+        ${retranslateBtn}
         ${errorsHtml}
     `;
     resultsSection.style.display = 'block';
+}
+
+async function retranslateBatch(batchId) {
+    const btn = event.currentTarget;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Retranslating...';
+
+    const engine = document.getElementById('translatorSelect')?.value || 'gemma3';
+    const storyContext = document.getElementById('storyContext')?.value || '';
+
+    try {
+        const resp = await fetch('/api/batch/retranslate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                batch_id: batchId,
+                translator: engine,
+                story_context: storyContext || undefined,
+                output_format: 'zip',
+                include_originals: true,
+            }),
+        });
+        const result = await resp.json();
+        if (!resp.ok) throw new Error(result.error || 'Retranslation failed');
+        showBatchResults({ ...result, total: result.processed + result.failed, chunk_size: '-' });
+        showNotification(`Retranslation complete: ${result.processed} pages`, 'success');
+    } catch (err) {
+        showNotification(`Retry failed: ${err.message}`, 'error');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-redo"></i> Retry Translation (skip OCR)';
+    }
 }
 
 function updateStageIndicators(currentStage) {

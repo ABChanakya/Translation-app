@@ -108,7 +108,8 @@ class MangaTranslationPipeline:
         detection_confidence: float = 0.25,
         nms_iou_threshold: float = 0.45,
         text_color: str = "#0000FF",
-        story_context: Optional[str] = None
+        story_context: Optional[str] = None,
+        vlm_context_enabled: bool = False,
     ):
         """
         Initialize the translation pipeline.
@@ -131,6 +132,7 @@ class MangaTranslationPipeline:
         self.target_lang = target_lang
         self.text_color = text_color
         self.story_context = story_context
+        self.vlm_context_enabled = vlm_context_enabled
         
         # Initialize models
         self.detector = TextDetector(detection_confidence, nms_iou_threshold)
@@ -212,6 +214,17 @@ class MangaTranslationPipeline:
             for class_id, bbox, conf in all_dets:
                 grouped_detections[class_id].append((bbox, conf))
 
+        # ── Optional: VLM visual context (1 Ollama vision call per page) ──────────
+        vlm_context = ""
+        if self.vlm_context_enabled:
+            from src.models.vlm_ocr import PageContextExtractor
+            print("🖼️  Extracting visual context from page (VLM)...")
+            vlm_context = PageContextExtractor(
+                model=getattr(self.translator, "model", "gemma3:12b")
+            ).extract_context(output_image)
+            if vlm_context:
+                print(f"   📝 Context: {vlm_context[:120]}{'…' if len(vlm_context) > 120 else ''}")
+
         # ── PASS 1: OCR (all regions) then one batch Translation call ────────────
         print("📖 Step 2/4: OCR (all regions)...")
 
@@ -219,12 +232,14 @@ class MangaTranslationPipeline:
         region_counter = 0
 
         # Build narrative context once for the whole page
-        context_prompt = ""
+        context_parts = []
         if previous_page_context:
-            context_prompt = (
-                f"[Previous page context:\n"
-                f"{chr(10).join(previous_page_context[-20:])}]\n"
+            context_parts.append(
+                f"[Previous page context:\n{chr(10).join(previous_page_context[-20:])}]"
             )
+        if vlm_context:
+            context_parts.append(f"[Visual context: {vlm_context}]")
+        context_prompt = "\n".join(context_parts)
 
         # Collect OCR results before calling the translator
         ocr_pending = []   # (region_type, region_name, bbox, confidence, original_text)
@@ -291,16 +306,28 @@ class MangaTranslationPipeline:
 
         print(f"\n   ✅ OCR+Translation done — {len(ready_regions)} regions to render")
 
-        # ── PASS 2: Inpainting (CPU LaMa or fast flat-fill) ──────────────────────
+        # ── Unload LLM from GPU so LaMa can use the VRAM for inpainting ──────────
+        print("🧹 Unloading translation model from GPU...")
+        self.translator.unload()
+        # Re-check LaMa availability now that VRAM is free (lazy-loads on first call)
+        if not self.inpainter.available:
+            self.inpainter.try_reconnect()
+
+        # ── PASS 2: Inpainting (brightness check → LaMa or fast flat-fill) ─────────
         print(f"🎨 Step 3/4: Inpainting {len(ready_regions)} regions...")
 
         for region_type, (x1, y1, x2, y2), _ in ready_regions:
-            if region_type in USE_LAMA_FOR_REGIONS and self.inpainter.available:
+            region_pixels = np.array(output_image)[y1:y2, x1:x2]
+            mean_brightness = region_pixels.mean()
+            if mean_brightness >= 240:
+                # Plain white bubble — instant flat-fill, no LaMa needed (~60-70% of regions)
+                print(f"   ⚡ Brightness skip ({mean_brightness:.0f}) — flat white fill")
+                ImageDraw.Draw(output_image).rectangle([x1, y1, x2, y2], fill=(255, 255, 255))
+            elif region_type in USE_LAMA_FOR_REGIONS and self.inpainter.available:
                 print(f"   🎨 LaMa inpainting ({x1},{y1})→({x2},{y2})...")
                 output_image = self.inpainter.inpaint_region(output_image, (x1, y1, x2, y2))
             else:
-                text_region_pixels = np.array(output_image)[y1:y2, x1:x2]
-                background_color = find_whitest_pixel(text_region_pixels)
+                background_color = find_whitest_pixel(region_pixels)
                 ImageDraw.Draw(output_image).rectangle([x1, y1, x2, y2], fill=background_color)
 
         # Rebuild draw context once after all inpainting is done
@@ -316,7 +343,11 @@ class MangaTranslationPipeline:
                 overlay_boxes.append((x1, y1, x2, y2))
                 overlay_texts.append(wrapped_text)
                 overlay_font_sizes.append(font.size)
-                overlay_colors.append((*text_rgb, 255))
+                # Smart text color: dark background → white text, light → user's chosen color
+                region_arr = np.array(output_image)[y1:y2, x1:x2]
+                bg_brightness = region_arr.mean()
+                region_color = (255, 255, 255, 255) if bg_brightness < 160 else (*text_rgb, 255)
+                overlay_colors.append(region_color)
 
         if overlay_boxes:
             output_image = render_text_overlay(
@@ -378,6 +409,7 @@ class MangaTranslationPipeline:
                 "id": log["region_id"],
                 "type": region_class,
                 "class_id": log["class_id"],
+                "bbox": list(log["bbox"]),
                 "original": log["src_text"],
                 "translated": log["tgt_text"],
                 "confidence": log["confidence"]

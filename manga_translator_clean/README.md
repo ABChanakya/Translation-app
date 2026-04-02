@@ -47,19 +47,7 @@ Pseudo-label workflow:
 ## Documentation Set
 
 Start here:
-- [QUICKSTART.md](/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/QUICKSTART.md)
-
-Engineering and project context:
-- [DEVELOPER_GUIDE.md](/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/DEVELOPER_GUIDE.md)
-
-Data workflow:
-- [data/README.md](/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/data/README.md)
-
-Colorization notes:
-- [colorization/readme.md](/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/colorization/readme.md)
-
-Future accessibility and scaling reservation:
-- [FUTURE_ACCESSIBILITY_AND_SCALING.md](/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/FUTURE_ACCESSIBILITY_AND_SCALING.md)
+- [DOCS_COMPACT.md](/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/DOCS_COMPACT.md)
 
 ## Quick Run
 

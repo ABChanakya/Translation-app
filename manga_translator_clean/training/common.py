@@ -162,6 +162,20 @@ def run_training_phase(
     if common_overrides:
         params.update(common_overrides)
     params.update(phase.overrides)
+
+    # Ultralytics 8.4.x can drop ``self.overrides['model']`` after a completed
+    # train() call, which breaks subsequent train() calls on the same instance
+    # with ``KeyError: 'model'``. Guard it explicitly.
+    if not isinstance(getattr(model, "overrides", None), dict):
+        model.overrides = {}
+    if "model" not in model.overrides:
+        model_ref = getattr(model, "ckpt_path", None)
+        if not model_ref:
+            model_ref = getattr(model, "pt_path", None)
+        if not model_ref:
+            model_ref = resolve_artifact_reference(DEFAULT_BASE_MODEL)
+        model.overrides["model"] = str(model_ref)
+
     return model.train(**params)
 
 
@@ -177,11 +191,15 @@ def run_training_plan(
     common_overrides: Mapping[str, Any] | None = None,
 ) -> tuple[YOLO, list[dict[str, str]]]:
     """Run a list of training phases and return the model plus generated weight paths."""
-    model = YOLO(resolve_artifact_reference(model_name))
+    current_model_ref = resolve_artifact_reference(model_name)
+    model = YOLO(current_model_ref)
     resolved_project_dir = resolve_project_path(project_dir)
     outputs: list[dict[str, str]] = []
 
     for phase in phases:
+        # Re-create the YOLO wrapper per phase to avoid stale internal state
+        # across successive train() calls in newer Ultralytics releases.
+        model = YOLO(current_model_ref)
         run_training_phase(
             model,
             data_yaml=data_yaml,
@@ -198,6 +216,10 @@ def run_training_plan(
                 "weights": str(resolved_project_dir / phase.name / "weights" / "best.pt"),
             }
         )
+        current_model_ref = outputs[-1]["weights"]
+
+    if outputs:
+        model = YOLO(outputs[-1]["weights"])
 
     return model, outputs
 

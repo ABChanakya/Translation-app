@@ -31,14 +31,8 @@ Assisted data generation:
 Main product overview:
 - [manga_translator_clean/README.md](/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/README.md)
 
-Run and setup guide:
-- [manga_translator_clean/QUICKSTART.md](/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/QUICKSTART.md)
-
-Larger engineering/context guide:
-- [manga_translator_clean/DEVELOPER_GUIDE.md](/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/DEVELOPER_GUIDE.md)
-
-Future accessibility and scaling notes:
-- [manga_translator_clean/FUTURE_ACCESSIBILITY_AND_SCALING.md](/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/FUTURE_ACCESSIBILITY_AND_SCALING.md)
+Condensed operations + developer guide:
+- [manga_translator_clean/DOCS_COMPACT.md](/home/chanakya/chanakya/Translation_tool-2/manga_translator_clean/DOCS_COMPACT.md)
 
 ## Root-Level Files Still Intentionally Kept
 

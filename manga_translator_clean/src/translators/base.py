@@ -42,6 +42,12 @@ class BaseTranslator(ABC):
         """
         return [self.translate(t, context_prompt=context_prompt, story_context=story_context) for t in texts]
 
+    def unload(self) -> None:
+        """Release any held GPU/CPU resources (e.g. unload LLM from VRAM).
+        Called by the pipeline after translation so inpainting can use the GPU.
+        Default is a no-op; override in translators that hold GPU memory."""
+        pass
+
     def is_available(self) -> bool:
         """Check if this translator is available/configured"""
         return True
@@ -73,7 +79,11 @@ class TranslatorFactory:
         if engine_name == "gemma3":
             from src.translators.gemma import GemmaTranslator
             return GemmaTranslator(source_lang, target_lang)
-        
+
+        elif engine_name == "translategemma":
+            from src.translators.translategemma import TranslateGemmaTranslator
+            return TranslateGemmaTranslator(source_lang, target_lang)
+
         elif engine_name == "google":
             from src.translators.google import GoogleTranslator
             return GoogleTranslator(source_lang, target_lang)

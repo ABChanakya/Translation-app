@@ -135,6 +135,9 @@ def render_text_overlay(
         cx = box_w // 2
         cy = box_h // 2
 
+        # Contrasting stroke improves readability on screentones and dark backgrounds
+        stroke_fill = (255, 255, 255) if color[:3] == (0, 0, 0) else (0, 0, 0)
+        stroke_width = max(1, font_size // 20)
         tile_draw.multiline_text(
             (cx, cy),
             text,
@@ -142,6 +145,8 @@ def render_text_overlay(
             fill=color,
             anchor="mm",
             align="center",
+            stroke_width=stroke_width,
+            stroke_fill=stroke_fill,
         )
 
         # Paste the tile back at the correct position on the base image

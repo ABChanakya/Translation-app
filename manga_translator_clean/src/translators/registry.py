@@ -73,6 +73,16 @@ ENGINE_SPECS: tuple[EngineSpec, ...] = (
         availability_check=_check_ollama_service,
     ),
     EngineSpec(
+        engine_id="translategemma",
+        label="TranslateGemma (Ollama)",
+        factory_name="TranslateGemma",
+        module_path="src.translators.translategemma.TranslateGemmaTranslator",
+        dependency_modules=("ollama",),
+        preferred_rank=12,
+        enable_instructions="Install Ollama, run 'ollama pull translategemma:12b', and start the Ollama service.",
+        availability_check=_check_ollama_service,
+    ),
+    EngineSpec(
         engine_id="google",
         label="Google Translate",
         factory_name="Google",

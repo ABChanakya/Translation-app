@@ -34,9 +34,8 @@ fi
 # Run from the service directory so gunicorn can find app.py
 cd "$DIR"
 
-# Use GPU by default — the translation pipeline (Gemma3 + OCR) runs first and
-# releases VRAM before LaMa inpainting starts, so there is no conflict.
-# Override with:  LAMA_DEVICE=cpu bash start_service.sh
+# Use GPU by default — the pipeline unloads Ollama before inpainting starts,
+# so there is no conflict. Override with: LAMA_DEVICE=cpu bash start_service.sh
 export LAMA_DEVICE="${LAMA_DEVICE:-auto}"
 echo "🖥️  LAMA_DEVICE=$LAMA_DEVICE"
 

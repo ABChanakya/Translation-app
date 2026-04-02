@@ -14,17 +14,14 @@ except ImportError:  # pragma: no cover - torch always available inside service 
 # Initialize Flask app
 app = Flask(__name__)
 
-# Load the LaMa model
-print("🎨 Loading LaMa inpainting model...")
-
-# Default to CPU to avoid GPU OOM unless explicitly overridden
-requested_device = os.environ.get("LAMA_DEVICE", "cpu").lower()
+# Resolve device and variant at startup (no GPU memory allocated yet)
+requested_device = os.environ.get("LAMA_DEVICE", "auto").lower()
+MODEL_VARIANT = os.environ.get("LAMA_MODEL_VARIANT", "big-lama")
 
 device = "cpu"
 if torch is not None:
     if requested_device == "auto":
         requested_device = "cuda" if torch.cuda.is_available() else "cpu"
-
     try:
         device = torch.device(requested_device)
     except (TypeError, ValueError) as err:
@@ -35,21 +32,62 @@ else:
         print("⚠️ Torch unavailable; forcing CPU for LaMa service.")
     device = "cpu"
 
-print(f"🖥️  Using LaMa device: {device}")
+print(f"🖥️  LaMa target device: {device}  (model will load on first inpaint request)")
+print(f"🎨 LaMa model variant: {MODEL_VARIANT}")
 
-try:
-    lama = SimpleLama(device=device if torch is not None else None)
-    print("✅ LaMa model loaded successfully.")
-except Exception as e:
-    print(f"❌ Error loading LaMa model: {e}")
-    lama = None
+# Lazy-loaded model — None until first /inpaint request
+lama = None
+_lama_load_error: str | None = None  # set if model failed to load
+
+
+def _resolve_lama_model_path():
+    """Download dreMaz/AnimeMangaInpainting checkpoint when LAMA_MODEL_VARIANT=anime-manga."""
+    if MODEL_VARIANT == "anime-manga":
+        try:
+            from huggingface_hub import hf_hub_download
+            path = hf_hub_download(
+                repo_id="dreMaz/AnimeMangaInpainting",
+                filename="big-lama.pt",
+            )
+            print(f"✅ Loaded dreMaz/AnimeMangaInpainting: {path}")
+            return path
+        except Exception as e:
+            print(f"⚠️  dreMaz download failed ({e}), falling back to default big-lama")
+    print("✅ Using default big-lama checkpoint")
+    return None
+
+
+def _ensure_lama_loaded():
+    """Load the LaMa model on first call. No-op if already loaded."""
+    global lama, _lama_load_error
+    if lama is not None:
+        return True
+    if _lama_load_error is not None:
+        return False
+    print("🎨 Loading LaMa model on first request...")
+    try:
+        lama = SimpleLama(device=device if torch is not None else None)
+        print("✅ LaMa model loaded successfully.")
+        return True
+    except Exception as e:
+        _lama_load_error = str(e)
+        print(f"❌ Error loading LaMa model: {e}")
+        return False
 
 @app.route('/', methods=['GET'])
 def index():
     model_ok = lama is not None
+    model_err = _lama_load_error
     device_label = str(device)
-    status_color = '#2ecc71' if model_ok else '#e74c3c'
-    status_text = 'Model ready' if model_ok else 'Model failed to load'
+    if model_err:
+        status_color = '#e74c3c'
+        status_text = f'Load error: {model_err[:80]}'
+    elif model_ok:
+        status_color = '#2ecc71'
+        status_text = 'Model ready'
+    else:
+        status_color = '#f39c12'
+        status_text = 'Waiting for first request (lazy load)'
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -84,6 +122,7 @@ def index():
     <p class="subtitle">Manga text removal microservice</p>
     <div class="badge">{status_text}</div>
     <div class="row"><span class="label">Device</span><span class="value">{device_label}</span></div>
+    <div class="row"><span class="label">Model</span><span class="value">{MODEL_VARIANT}</span></div>
     <div class="row"><span class="label">Port</span><span class="value">5001</span></div>
     <div class="row"><span class="label">Main app</span>
       <span class="value"><a href="http://127.0.0.1:5000" style="color:#4a90e2">localhost:5000</a></span></div>
@@ -107,8 +146,8 @@ def inpaint_image():
       dilate=N  — dilate the mask by N pixels (default 4) to ensure all
                   text ink at mask edges is covered before inpainting.
     """
-    if lama is None:
-        return jsonify({'error': 'LaMa model is not available.'}), 500
+    if not _ensure_lama_loaded():
+        return jsonify({'error': f'LaMa model failed to load: {_lama_load_error}'}), 500
 
     if 'image' not in request.files or 'mask' not in request.files:
         return jsonify({'error': 'Missing image or mask file.'}), 400
@@ -163,12 +202,12 @@ def inpaint_image():
 @app.route('/health', methods=['GET'])
 def health_check():
     """
-    Health check endpoint to verify the service is running and the model is loaded.
+    Health check endpoint. Returns model_loaded=True as long as there's no
+    load error — the model loads lazily on the first /inpaint request.
     """
-    if lama:
-        return jsonify({'status': 'ok', 'model_loaded': True}), 200
-    else:
-        return jsonify({'status': 'error', 'model_loaded': False}), 500
+    if _lama_load_error:
+        return jsonify({'status': 'error', 'model_loaded': False, 'error': _lama_load_error}), 500
+    return jsonify({'status': 'ok', 'model_loaded': True}), 200
 
 if __name__ == '__main__':
     # Run the app

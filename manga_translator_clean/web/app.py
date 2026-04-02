@@ -761,6 +761,7 @@ def translate_image():
         confidence = float(data.get("confidence", settings.DEFAULT_CONFIDENCE))
         iou_threshold = float(data.get("iou_threshold", settings.DEFAULT_IOU_THRESHOLD))
         story_context = data.get("story_context", None)
+        vlm_context = bool(data.get("vlm_context", False))
 
         if not input_path or not Path(input_path).exists():
             return jsonify({"error": "Invalid input path"}), 400
@@ -778,6 +779,7 @@ def translate_image():
             nms_iou_threshold=iou_threshold,
             text_color="#000000",
             story_context=story_context,
+            vlm_context_enabled=vlm_context,
         )
 
         output_filename = f"translated_{Path(input_path).name}"
@@ -903,6 +905,7 @@ def batch_translate():
         include_originals = bool(data.get("include_originals", True))
         chunk_size = int(data.get("chunk_size", DEFAULT_BATCH_CHUNK_SIZE))
         story_context = data.get("story_context", None)  # Optional global story context
+        vlm_context = bool(data.get("vlm_context", False))
 
         pipeline = MangaTranslationPipeline(
             source_lang="ja",
@@ -911,7 +914,8 @@ def batch_translate():
             detection_confidence=confidence,
             nms_iou_threshold=iou_threshold,
             text_color="#000000",
-            story_context=story_context,  # Pass story context to pipeline
+            story_context=story_context,
+            vlm_context_enabled=vlm_context,
         )
 
         def process_single_page(input_path: str, output_path: str, story_context: str = None, **kwargs):
@@ -977,6 +981,207 @@ def batch_translate():
         return jsonify({"error": str(exc)}), 500
 
 
+@app.route("/api/batch/retranslate", methods=["POST"])
+def batch_retranslate():
+    """
+    Re-translate a failed batch using saved OCR text from batch_info.json.
+    Skips YOLO detection and OCR — only redoes translation + inpainting + render.
+
+    Body: { "batch_id": "20260402_091923", "translator": "gemma3",
+            "story_context": "...", "target_lang": "en" }
+    """
+    global pipeline
+
+    try:
+        data = request.get_json() or {}
+        batch_id = data.get("batch_id")
+        if not batch_id:
+            return jsonify({"error": "batch_id is required"}), 400
+
+        batch_dir = Path(app.config["BATCH_FOLDER"]) / f"batch_{batch_id}"
+        info_path = batch_dir / "batch_info.json"
+        if not info_path.exists():
+            return jsonify({"error": f"batch_info.json not found for batch {batch_id}"}), 404
+
+        saved = json.loads(info_path.read_text(encoding="utf-8"))
+
+        target_lang = data.get("target_lang", "en")
+        translator_type = data.get("translator", "gemma3")
+        story_context = data.get("story_context") or saved.get("story_context")
+        output_format = data.get("output_format", "zip")
+        include_originals = bool(data.get("include_originals", True))
+
+        from PIL import Image as PILImage
+        from src.models.inpainter import TextInpainter
+        from src.translators.base import TranslatorFactory
+        from src.utils.image import find_whitest_pixel
+        from src.utils.text import fit_text_to_box, render_text_overlay
+        from config.settings import USE_LAMA_FOR_REGIONS
+        import numpy as np
+        from PIL import ImageDraw, ImageColor
+
+        translator = TranslatorFactory.create(translator_type, "ja", target_lang)
+        inpainter = TextInpainter()
+        text_rgb = ImageColor.getrgb("#000000")
+
+        new_batch_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+        new_batch_dir = Path(app.config["BATCH_FOLDER"]) / f"batch_{new_batch_id}"
+        new_batch_dir.mkdir(parents=True, exist_ok=True)
+
+        new_pages = []
+        errors = []
+
+        for page in saved.get("pages", []):
+            input_path = page.get("input")
+            filename = page.get("filename", "")
+            translations_saved = page.get("stats", {}).get("translations", [])
+
+            if not input_path or not Path(input_path).exists():
+                errors.append({"filename": filename, "error": "Input image not found"})
+                continue
+
+            try:
+                # Collect OCR texts from saved data
+                ocr_items = []  # (bbox_or_None, class_id, original_text)
+                for t in translations_saved:
+                    orig = t.get("original", "")
+                    if not orig:
+                        continue
+                    raw_bbox = t.get("bbox")
+                    bbox = tuple(raw_bbox) if raw_bbox else None
+                    class_id = t.get("class_id", 0)
+                    ocr_items.append((bbox, class_id, orig))
+
+                if not ocr_items:
+                    errors.append({"filename": filename, "error": "No saved OCR data"})
+                    continue
+
+                has_bboxes = any(item[0] is not None for item in ocr_items)
+
+                # Batch translate all texts for this page
+                texts = [item[2] for item in ocr_items]
+                context_parts = []
+                if story_context:
+                    ctx = story_context[:1200] + ("…" if len(story_context) > 1200 else "")
+                    context_parts.append(f"[Story Context]\n{ctx}")
+                context_prompt = "\n".join(context_parts)
+
+                try:
+                    translated_texts = translator.translate_batch(
+                        texts, context_prompt=context_prompt, story_context=story_context
+                    )
+                except Exception as te:
+                    errors.append({"filename": filename, "error": f"Translation failed: {te}"})
+                    continue
+
+                # Unload translator to free VRAM for inpainting
+                translator.unload()
+
+                output_image = PILImage.open(input_path).convert("RGB")
+
+                if has_bboxes:
+                    if not inpainter.available:
+                        inpainter.try_reconnect()
+
+                    # Pass 2: inpainting
+                    for (bbox, class_id, _orig), translated in zip(ocr_items, translated_texts):
+                        if not translated or bbox is None:
+                            continue
+                        x1, y1, x2, y2 = bbox
+                        region_pixels = np.array(output_image)[y1:y2, x1:x2]
+                        mean_brightness = region_pixels.mean()
+                        if mean_brightness >= 240:
+                            ImageDraw.Draw(output_image).rectangle([x1, y1, x2, y2], fill=(255, 255, 255))
+                        elif class_id in USE_LAMA_FOR_REGIONS and inpainter.available:
+                            output_image = inpainter.inpaint_region(output_image, (x1, y1, x2, y2))
+                        else:
+                            bg = find_whitest_pixel(region_pixels)
+                            ImageDraw.Draw(output_image).rectangle([x1, y1, x2, y2], fill=bg)
+
+                    # Pass 3: render text
+                    draw = ImageDraw.Draw(output_image)
+                    boxes, texts_out, sizes, colors = [], [], [], []
+                    for (bbox, _class_id, _orig), translated in zip(ocr_items, translated_texts):
+                        if not translated or bbox is None:
+                            continue
+                        x1, y1, x2, y2 = bbox
+                        wrapped, font = fit_text_to_box(draw, translated, (x1, y1, x2, y2))
+                        bg = np.array(output_image)[y1:y2, x1:x2].mean()
+                        color = (255, 255, 255, 255) if bg < 160 else (*text_rgb, 255)
+                        boxes.append((x1, y1, x2, y2))
+                        texts_out.append(wrapped)
+                        sizes.append(font.size)
+                        colors.append(color)
+
+                    if boxes:
+                        output_image = render_text_overlay(output_image, boxes, texts_out, sizes, colors)
+
+                output_path = new_batch_dir / f"translated_{filename}"
+                output_image.save(str(output_path))
+
+                new_pages.append({
+                    "index": page.get("index"),
+                    "input": input_path,
+                    "output": str(output_path),
+                    "filename": filename,
+                    "stats": {
+                        "bubbles_detected": len(ocr_items),
+                        "regions_detected": len(ocr_items),
+                        "translations": [
+                            {"original": orig, "translated": tgt}
+                            for orig, tgt in zip(texts, translated_texts)
+                        ],
+                    },
+                })
+
+            except Exception as page_err:
+                errors.append({"filename": filename, "error": str(page_err)})
+
+        if not new_pages:
+            return jsonify({"error": "All pages failed to retranslate", "errors": errors}), 422
+
+        batch_result = {
+            "batch_id": new_batch_id,
+            "temp_dir": str(new_batch_dir),
+            "pages": new_pages,
+            "processed": len(new_pages),
+            "failed": len(errors),
+            "total_pages": len(saved.get("pages", [])),
+            "errors": errors,
+        }
+
+        # Save updated batch_info.json
+        (new_batch_dir / "batch_info.json").write_text(
+            json.dumps(batch_result, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+
+        output_files = {}
+        if output_format in {"zip", "both"}:
+            try:
+                zip_path = batch_processor.create_zip(batch_result, include_originals=include_originals)
+                output_files["zip"] = {
+                    "path": zip_path,
+                    "url": url_for("get_batch_output", filename=Path(zip_path).name),
+                    "filename": Path(zip_path).name,
+                }
+            except Exception as ze:
+                output_files["zip"] = {"error": str(ze)}
+
+        batch_processor.cleanup_temp_files(batch_result)
+
+        return jsonify({
+            "success": True,
+            "batch_id": new_batch_id,
+            "processed": len(new_pages),
+            "failed": len(errors),
+            "outputs": output_files,
+            "errors": errors,
+        })
+
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
 @app.route("/batch_outputs/<filename>")
 def get_batch_output(filename: str):
     return send_from_directory(app.config["BATCH_FOLDER"], filename)
@@ -992,5 +1197,34 @@ def get_upload(filename: str):
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
 
 
+def _ensure_manga_font():
+    """Download Bangers (OFL manga-style font) on first run. Falls back to DejaVu."""
+    font_path = PROJECT_ROOT / "assets" / "fonts" / "Bangers-Regular.ttf"
+    if not font_path.exists():
+        font_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            import urllib.request
+            # Try multiple CDN URLs in case one is stale
+            urls = [
+                "https://fonts.gstatic.com/s/bangers/v25/FeVQS0BTqb0h60ACL5la2bxii28wYQ.ttf",
+                "https://fonts.gstatic.com/s/bangers/v24/FeVQS0BTqb0h60ACL5la2bxii28wYQ.ttf",
+                "https://github.com/google/fonts/raw/main/ofl/bangers/Bangers-Regular.ttf",
+            ]
+            downloaded = False
+            for url in urls:
+                try:
+                    urllib.request.urlretrieve(url, font_path)
+                    downloaded = True
+                    break
+                except Exception:
+                    continue
+            if not downloaded:
+                raise Exception("All font URLs failed")
+            print(f"✅ Downloaded Bangers font → {font_path}")
+        except Exception as e:
+            print(f"⚠️  Font download failed ({e}), using system font")
+
+
 if __name__ == "__main__":
+    _ensure_manga_font()
     app.run(debug=True, use_reloader=False, host="0.0.0.0", port=5000)

@@ -59,8 +59,14 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 MAX_IMAGE_SIZE = 1600  # Max dimension for processing (larger = slower but more accurate)
 
 # Detection thresholds
-DEFAULT_CONFIDENCE = 0.10  # Lower default to catch more bubbles
+DEFAULT_CONFIDENCE = 0.15  # Raised to reduce false/duplicate detections
 DEFAULT_IOU_THRESHOLD = 0.55  # Stricter NMS to limit duplicates
+
+# Extra cross-class dedup (after NMS) to remove near-identical overlapping boxes.
+# Useful when the same bubble gets predicted as Dialogue/Text/Signs simultaneously.
+# Lower IoU = more aggressive dedup (catches same-class near-duplicates too).
+ENABLE_CROSS_CLASS_DEDUP = True
+CROSS_CLASS_DEDUP_IOU = 0.45
 
 # Cache directory
 CACHE_DIR = os.path.join(tempfile.gettempdir(), "manga_translator_cache")
@@ -87,13 +93,27 @@ NLLB_MODEL_ID = "facebook/nllb-200-distilled-600M"
 GEMMA_MODEL = "gemma3:12b"  # Using the 12B model for better quality
 GEMMA_KEEP_ALIVE = "1h"
 
+# TranslateGemma settings (translation-optimized Gemma 3 fine-tune via Ollama)
+# Benchmarks above gemma3:27b on translation metrics at ~8 GB Q4. Retains vision capability.
+TRANSLATEGEMMA_MODEL = os.getenv("TRANSLATEGEMMA_MODEL", "translategemma:12b")
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 #                           TEXT RENDERING SETTINGS
 # ═══════════════════════════════════════════════════════════════════════════
 
-# Font configuration
-FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+# Font configuration — prefers manga-style Bangers font, falls back to DejaVu
+def _resolve_font_path() -> str:
+    override = os.getenv("FONT_PATH", "")
+    if override and Path(override).exists():
+        return override
+    bangers = PROJECT_ROOT / "assets" / "fonts" / "Bangers-Regular.ttf"
+    if bangers.exists():
+        return str(bangers)
+    system = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+    return str(system) if system.exists() else ""
+
+FONT_PATH = _resolve_font_path()
 # 60 was far too large — a 60px font overflows small speech bubbles and
 # bleeds into artwork. 28 is the practical upper bound for manga bubble text.
 DEFAULT_FONT_SIZE_MAX = 28
@@ -118,6 +138,7 @@ PRODUCT_NAME = "Auto Manga Translation"
 # Available translation engines
 AVAILABLE_ENGINES = [
     "Gemma3",
+    "TranslateGemma",
     "Google",
     "DeepL",
     "Argos",
@@ -165,6 +186,8 @@ class Settings:
     MAX_IMAGE_SIZE = MAX_IMAGE_SIZE
     DEFAULT_CONFIDENCE = DEFAULT_CONFIDENCE
     DEFAULT_IOU_THRESHOLD = DEFAULT_IOU_THRESHOLD
+    ENABLE_CROSS_CLASS_DEDUP = ENABLE_CROSS_CLASS_DEDUP
+    CROSS_CLASS_DEDUP_IOU = CROSS_CLASS_DEDUP_IOU
     CACHE_DIR = CACHE_DIR
     PROJECT_ROOT = str(PROJECT_ROOT)
     DEFAULT_DATASET_YAML = DEFAULT_DATASET_YAML
@@ -177,6 +200,7 @@ class Settings:
     NLLB_MODEL_ID = NLLB_MODEL_ID
     GEMMA_MODEL = GEMMA_MODEL
     GEMMA_KEEP_ALIVE = GEMMA_KEEP_ALIVE
+    TRANSLATEGEMMA_MODEL = TRANSLATEGEMMA_MODEL
     
     # Text Rendering Settings
     FONT_PATH = FONT_PATH

@@ -16,3 +16,4 @@ Pillow<10.0.0
 numpy
 opencv-python-headless
 gunicorn
+huggingface_hub  # for dreMaz/AnimeMangaInpainting download (LAMA_MODEL_VARIANT=anime-manga)

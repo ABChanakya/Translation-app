@@ -12,14 +12,15 @@ echo ""
 echo "1) 🌐 Start Web Interface only"
 echo "2) 🌐 Start Web + LaMa Inpainting  ← recommended for best quality"
 echo "3) 🎨 Start LaMa Inpainting Service only (port 5001)"
-echo "4) 🏋️  Train a Model (Admin/developer mode)"
-echo "5) 📊 View System Status"
-echo "6) 📚 Open Documentation"
-echo "7) 🛠️  Run Data Utilities"
-echo "8) 📖 Show Quickstart"
-echo "9) 🚪 Exit"
+echo "4) ⚡ Start FastAPI async service (port 8000)"
+echo "5) 🏋️  Train a Model (Admin/developer mode)"
+echo "6) 📊 View System Status"
+echo "7) 📚 Open Documentation"
+echo "8) 🛠️  Run Data Utilities"
+echo "9) 📖 Show Quickstart"
+echo "0) 🚪 Exit"
 echo ""
-read -p "Enter your choice (1-9): " choice
+read -p "Enter your choice (0-9): " choice
 
 case $choice in
     1)
@@ -53,6 +54,15 @@ case $choice in
         ;;
     4)
         echo ""
+        echo "⚡ Starting FastAPI async service on http://0.0.0.0:8000..."
+        echo "   Docs: http://localhost:8000/docs"
+        echo "   Endpoints: POST /translate  POST /translate/vlm"
+        echo ""
+        cd ~/chanakya/Translation_tool-2/manga_translator_clean
+        uvicorn src.fastapi_service:app --host 0.0.0.0 --port 8000
+        ;;
+    5)
+        echo ""
         echo "🏋️  Available training scripts:"
         echo "   1. advanced_train_yolo.py"
         echo "   2. train_and_eval.py"
@@ -66,13 +76,13 @@ case $choice in
             *) echo "Invalid choice" ;;
         esac
         ;;
-    5)
+    6)
         echo ""
         python verify_all.py | head -50
         echo ""
         echo "📖 Read full report: python verify_all.py"
         ;;
-    6)
+    7)
         echo ""
         echo "📚 Available Documentation:"
         printf '%s\n' \
@@ -90,7 +100,7 @@ case $choice in
             echo "File not found!"
         fi
         ;;
-    7)
+    8)
         echo ""
         echo "🛠️  Data Utilities:"
         echo "   1. dedupe.py - Remove duplicates"
@@ -107,11 +117,11 @@ case $choice in
             *) echo "Invalid choice" ;;
         esac
         ;;
-    8)
+    9)
         echo ""
         cat QUICKSTART.md | less
         ;;
-    9)
+    0)
         echo "👋 Goodbye!"
         exit 0
         ;;

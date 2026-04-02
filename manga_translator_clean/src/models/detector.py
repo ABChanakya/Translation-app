@@ -12,7 +12,9 @@ from config.settings import (
     DEVICE,
     MODEL_CACHE_TTL,
     DEFAULT_CONFIDENCE,
-    DEFAULT_IOU_THRESHOLD
+    DEFAULT_IOU_THRESHOLD,
+    ENABLE_CROSS_CLASS_DEDUP,
+    CROSS_CLASS_DEDUP_IOU,
 )
 
 # Import advanced NMS methods
@@ -80,12 +82,16 @@ class TextDetector:
         self.confidence = confidence
         self.iou_threshold = iou_threshold
         self.nms_method = nms_method if ADVANCED_NMS_AVAILABLE else 'standard'
+        self.enable_cross_class_dedup = ENABLE_CROSS_CLASS_DEDUP
+        self.cross_class_dedup_iou = CROSS_CLASS_DEDUP_IOU
         self.model = load_yolo_detector()
         
         print(f"🎯 Detector initialized with:")
         print(f"   Confidence: {self.confidence}")
         print(f"   IoU Threshold: {self.iou_threshold}")
         print(f"   NMS Method: {self.nms_method}")
+        if self.enable_cross_class_dedup:
+            print(f"   Cross-class dedup IoU: {self.cross_class_dedup_iou}")
     
     def detect(self, image, apply_advanced_nms: bool = True):
         """
@@ -120,11 +126,93 @@ class TextDetector:
         # Apply advanced NMS if enabled and available
         if apply_advanced_nms and ADVANCED_NMS_AVAILABLE and self.nms_method != 'standard':
             result = self._apply_advanced_nms(result)
+
+        if self.enable_cross_class_dedup:
+            result = self._apply_cross_class_dedup(result)
         
         # Log final detection count
         total_detections = len(result.boxes)
         print(f"   📊 Final detections: {total_detections} (method: {self.nms_method})")
         
+        return result
+
+    def _apply_cross_class_dedup(self, result):
+        """
+        Remove near-identical overlapping boxes across classes.
+
+        This keeps one best box for highly-overlapping duplicates that often appear
+        as Dialogue/Text/Signs for the same region.
+        """
+        if len(result.boxes) <= 1:
+            return result
+
+        boxes = result.boxes.xyxy
+        scores = result.boxes.conf
+        classes = result.boxes.cls.long()
+        device = boxes.device
+
+        # Slight preference when scores are near-ties.
+        # Dialogue > Text > Signs > Sound Effects > Removal
+        class_bonus = {
+            0: 0.030,
+            3: 0.020,
+            2: 0.010,
+            1: 0.000,
+            4: -0.010,
+        }
+        bonus = torch.tensor(
+            [class_bonus.get(int(c.item()), 0.0) for c in classes],
+            device=device,
+            dtype=scores.dtype,
+        )
+        ranking_scores = scores + bonus
+        order = torch.argsort(ranking_scores, descending=True)
+
+        keep = []
+        suppressed = torch.zeros(len(order), dtype=torch.bool, device=device)
+
+        ordered_boxes = boxes[order]
+
+        def _pair_iou(box: torch.Tensor, others: torch.Tensor) -> torch.Tensor:
+            x1 = torch.maximum(box[0], others[:, 0])
+            y1 = torch.maximum(box[1], others[:, 1])
+            x2 = torch.minimum(box[2], others[:, 2])
+            y2 = torch.minimum(box[3], others[:, 3])
+            inter = (x2 - x1).clamp(min=0) * (y2 - y1).clamp(min=0)
+            area_a = (box[2] - box[0]).clamp(min=0) * (box[3] - box[1]).clamp(min=0)
+            area_b = (others[:, 2] - others[:, 0]).clamp(min=0) * (others[:, 3] - others[:, 1]).clamp(min=0)
+            union = area_a + area_b - inter
+            return inter / union.clamp(min=1e-6)
+
+        for i in range(len(order)):
+            if suppressed[i]:
+                continue
+            keep.append(order[i])
+            if i == len(order) - 1:
+                continue
+            if suppressed[i + 1 :].all():
+                continue
+
+            cur_box = ordered_boxes[i]
+            rest_boxes = ordered_boxes[i + 1 :]
+            ious = _pair_iou(cur_box, rest_boxes)
+            overlap_mask = ious >= self.cross_class_dedup_iou
+            suppressed[i + 1 :] |= overlap_mask
+
+        if len(keep) == len(boxes):
+            return result
+
+        keep = torch.stack(keep)
+        deduped_boxes = boxes[keep]
+        deduped_scores = scores[keep]
+        deduped_classes = result.boxes.cls[keep]
+
+        new_boxes_data = torch.cat([
+            deduped_boxes,
+            deduped_scores.unsqueeze(1),
+            deduped_classes.unsqueeze(1),
+        ], dim=1)
+        result.boxes = Boxes(new_boxes_data, result.orig_shape)
         return result
     
     def _apply_advanced_nms(self, result):
