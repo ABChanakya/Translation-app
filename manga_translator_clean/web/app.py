@@ -906,6 +906,16 @@ def batch_translate():
         chunk_size = int(data.get("chunk_size", DEFAULT_BATCH_CHUNK_SIZE))
         story_context = data.get("story_context", None)  # Optional global story context
         vlm_context = bool(data.get("vlm_context", False))
+        series_name = data.get("series_name", "")  # MangaProfile series name
+        chapter_num = int(data.get("chapter_num", 1))
+
+        # Load MangaProfile if series name provided
+        manga_profile = None
+        if series_name:
+            from src.translation.manga_profile import MangaProfile
+            profiles_dir = str(PROJECT_ROOT / "profiles")
+            manga_profile = MangaProfile(series_name, profiles_dir=profiles_dir)
+            print(f"📚 Loaded profile: {manga_profile}")
 
         pipeline = MangaTranslationPipeline(
             source_lang="ja",
@@ -916,6 +926,8 @@ def batch_translate():
             text_color="#000000",
             story_context=story_context,
             vlm_context_enabled=vlm_context,
+            manga_profile=manga_profile,
+            chapter_num=chapter_num,
         )
 
         def process_single_page(input_path: str, output_path: str, story_context: str = None, **kwargs):
@@ -1180,6 +1192,76 @@ def batch_retranslate():
 
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/api/profiles", methods=["GET"])
+def list_profiles():
+    """List all manga translation profiles."""
+    from src.translation.manga_profile import MangaProfile
+
+    profiles_dir = PROJECT_ROOT / "profiles"
+    profiles_dir.mkdir(exist_ok=True)
+    result = []
+    for f in sorted(profiles_dir.glob("*.json")):
+        try:
+            with open(f, "r", encoding="utf-8") as fp:
+                data = json.load(fp)
+            result.append({
+                "series_name": data.get("series_name", f.stem),
+                "glossary_count": len(data.get("glossary", {})),
+                "character_count": len(data.get("character_names", {})),
+                "chapter_count": len(data.get("chapter_summaries", {})),
+                "recent_count": len(data.get("recent_translations", [])),
+                "style": data.get("settings", {}).get("translation_style", "natural"),
+            })
+        except Exception:
+            pass
+    return jsonify({"profiles": result})
+
+
+@app.route("/api/profiles/<series_name>", methods=["GET"])
+def get_profile(series_name: str):
+    """Get full profile data."""
+    from src.translation.manga_profile import MangaProfile
+
+    profiles_dir = str(PROJECT_ROOT / "profiles")
+    profile = MangaProfile(series_name, profiles_dir=profiles_dir)
+    return jsonify(profile.data)
+
+
+@app.route("/api/profiles/<series_name>", methods=["POST"])
+def update_profile(series_name: str):
+    """Create or update profile. Body can include glossary terms, characters, etc."""
+    from src.translation.manga_profile import MangaProfile
+
+    profiles_dir = str(PROJECT_ROOT / "profiles")
+    profile = MangaProfile(series_name, profiles_dir=profiles_dir)
+    data = request.get_json() or {}
+
+    # Add glossary terms
+    for term in data.get("glossary_terms", []):
+        profile.add_glossary_term(
+            term["japanese"], term["english"],
+            term.get("category", "general"),
+        )
+
+    # Add characters
+    for char in data.get("characters", []):
+        profile.add_character(
+            char["japanese"], char["english"],
+            char.get("pronouns", "they/them"),
+            char.get("role", ""),
+        )
+
+    # Set style
+    if "translation_style" in data:
+        profile.set_translation_style(data["translation_style"])
+
+    if "preserve_honorifics" in data:
+        profile.set_preserve_honorifics(bool(data["preserve_honorifics"]))
+
+    profile.save()
+    return jsonify({"success": True, "profile": profile.data})
 
 
 @app.route("/batch_outputs/<filename>")

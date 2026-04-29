@@ -31,7 +31,7 @@ class PageContextExtractor:
     translating every region on that page.
 
     Usage:
-        extractor = PageContextExtractor(model="gemma3:12b")
+        extractor = PageContextExtractor(model="gemma4:latest")
         ctx = extractor.extract_context(page_image)
         # ctx → "Two characters arguing in a hallway. The speaker on the left
         #         looks furious, pointing accusingly at the other."
@@ -44,7 +44,7 @@ class PageContextExtractor:
         "Any important visual context for translation?"
     )
 
-    def __init__(self, model: str = "gemma3:12b"):
+    def __init__(self, model: str = "gemma4:latest"):
         self.model = model
 
     @staticmethod

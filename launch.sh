@@ -3,6 +3,15 @@
 
 cd ~/chanakya/Translation_tool-2/manga_translator_clean
 
+# Use the venv Python, fall back to python3, then python
+if [ -x ".venv/bin/python" ]; then
+    PYTHON=".venv/bin/python"
+elif command -v python3 &>/dev/null; then
+    PYTHON="python3"
+else
+    PYTHON="python"
+fi
+
 echo "╔════════════════════════════════════════════════════════════════════╗"
 echo "║            🎌 AUTO MANGA TRANSLATION - LAUNCHER                 ║"
 echo "╚════════════════════════════════════════════════════════════════════╝"
@@ -22,44 +31,82 @@ echo "0) 🚪 Exit"
 echo ""
 read -p "Enter your choice (0-9): " choice
 
+is_port_in_use() {
+    local port="$1"
+    lsof -i TCP:"$port" >/dev/null 2>&1
+}
+
 case $choice in
     1)
         echo ""
         echo "🌐 Starting Web Interface..."
         echo "   Visit: http://localhost:5000"
         echo ""
-        python web/app.py
+        $PYTHON web/app.py
         ;;
     2)
         echo ""
-        echo "🎨 Starting LaMa inpainting service in the background..."
-        bash lama_service/start_service.sh &
-        LAMA_PID=$!
-        echo "   LaMa PID: $LAMA_PID  (listening on port 5001)"
-        echo "   Waiting 10 seconds for the model to load..."
-        sleep 10
+        if is_port_in_use 5001; then
+            echo "🎨 LaMa inpainting service is already running on port 5001."
+            echo "   Reusing the existing service."
+        else
+            echo "🎨 Starting LaMa inpainting service in the background..."
+            bash lama_service/start_service.sh &
+            LAMA_PID=$!
+            echo "   LaMa PID: $LAMA_PID  (listening on port 5001)"
+            echo "   Waiting 10 seconds for the model to load..."
+            sleep 10
+        fi
         echo ""
         echo "🌐 Starting Web Interface..."
         echo "   Visit: http://localhost:5000"
         echo "   Press Ctrl+C to stop both services."
         echo ""
-        trap "echo ''; echo 'Stopping LaMa service...'; kill $LAMA_PID 2>/dev/null; exit" INT TERM
-        python web/app.py
-        kill $LAMA_PID 2>/dev/null
+        if [ -n "$LAMA_PID" ]; then
+            trap "echo ''; echo 'Stopping LaMa service...'; kill $LAMA_PID 2>/dev/null; exit" INT TERM
+        fi
+        $PYTHON web/app.py
+        if [ -n "$LAMA_PID" ]; then
+            kill $LAMA_PID 2>/dev/null
+        fi
         ;;
     3)
         echo ""
+        if is_port_in_use 5001; then
+            echo "🎨 LaMa inpainting service is already running on port 5001."
+            echo "   Reuse the existing service or stop it before starting a new one."
+            exit 0
+        fi
         echo "🎨 Starting LaMa inpainting service on http://0.0.0.0:5001..."
         bash lama_service/start_service.sh
         ;;
     4)
         echo ""
-        echo "⚡ Starting FastAPI async service on http://0.0.0.0:8000..."
-        echo "   Docs: http://localhost:8000/docs"
-        echo "   Endpoints: POST /translate  POST /translate/vlm"
+        if is_port_in_use 5001; then
+            echo "🎨 LaMa inpainting service is already running on port 5001."
+            echo "   Reusing the existing service."
+        else
+            echo "🎨 Starting LaMa inpainting service in the background..."
+            bash lama_service/start_service.sh &
+            LAMA_PID=$!
+            echo "   LaMa PID: $LAMA_PID  (listening on port 5001)"
+            echo "   Waiting 10 seconds for the model to load..."
+            sleep 10
+        fi
         echo ""
-        cd ~/chanakya/Translation_tool-2/manga_translator_clean
-        uvicorn src.fastapi_service:app --host 0.0.0.0 --port 8000
+        echo "⚡ Starting FastAPI async service on http://0.0.0.0:8000..."
+        echo "   Web UI:    http://localhost:8000"
+        echo "   API Docs:  http://localhost:8000/docs"
+        echo "   Endpoints: POST /translate  POST /translate/vlm"
+        echo "   Press Ctrl+C to stop both services."
+        echo ""
+        if [ -n "$LAMA_PID" ]; then
+            trap "echo ''; echo 'Stopping LaMa service...'; kill $LAMA_PID 2>/dev/null; exit" INT TERM
+        fi
+        $PYTHON -m uvicorn src.fastapi_service:app --host 0.0.0.0 --port 8000
+        if [ -n "$LAMA_PID" ]; then
+            kill $LAMA_PID 2>/dev/null
+        fi
         ;;
     5)
         echo ""
@@ -70,17 +117,17 @@ case $choice in
         echo ""
         read -p "Choose (1-3): " train_choice
         case $train_choice in
-            1) python training/advanced_train_yolo.py ;;
-            2) python training/train_and_eval.py ;;
-            3) python training/create_pseudo_labels.py --help ;;
+            1) $PYTHON training/advanced_train_yolo.py ;;
+            2) $PYTHON training/train_and_eval.py ;;
+            3) $PYTHON training/create_pseudo_labels.py --help ;;
             *) echo "Invalid choice" ;;
         esac
         ;;
     6)
         echo ""
-        python verify_all.py | head -50
+        $PYTHON verify_all.py | head -50
         echo ""
-        echo "📖 Read full report: python verify_all.py"
+        echo "📖 Read full report: $PYTHON verify_all.py"
         ;;
     7)
         echo ""
@@ -110,10 +157,10 @@ case $choice in
         echo ""
         read -p "Choose (1-4): " util_choice
         case $util_choice in
-            1) python data/utils/dedupe.py --help ;;
-            2) python data/utils/counts.py --help ;;
-            3) python data/scrapers/rawkuma_scraper.py --help ;;
-            4) python data/utils/rename_seq.py --help ;;
+            1) $PYTHON data/utils/dedupe.py --help ;;
+            2) $PYTHON data/utils/counts.py --help ;;
+            3) $PYTHON data/scrapers/rawkuma_scraper.py --help ;;
+            4) $PYTHON data/utils/rename_seq.py --help ;;
             *) echo "Invalid choice" ;;
         esac
         ;;

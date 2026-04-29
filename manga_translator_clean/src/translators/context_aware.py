@@ -16,7 +16,7 @@ class ContextAwareTranslator:
     
     def __init__(
         self,
-        model: str = "gemma3:latest",
+        model: str = "gemma4:latest",
         source_lang: str = "ja",
         target_lang: str = "en"
     ):

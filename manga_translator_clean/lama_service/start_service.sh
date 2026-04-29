@@ -34,6 +34,11 @@ fi
 # Run from the service directory so gunicorn can find app.py
 cd "$DIR"
 
+if lsof -i TCP:5001 >/dev/null 2>&1; then
+    echo "⚠️  Port 5001 is already in use. Reusing the existing LaMa service instead of starting another instance."
+    exit 0
+fi
+
 # Use GPU by default — the pipeline unloads Ollama before inpainting starts,
 # so there is no conflict. Override with: LAMA_DEVICE=cpu bash start_service.sh
 export LAMA_DEVICE="${LAMA_DEVICE:-auto}"

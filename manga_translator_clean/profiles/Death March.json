@@ -1,0 +1,226 @@
+{
+  "series_name": "Death March",
+  "created_at": "2026-04-14T23:19:50.355993",
+  "glossary": {
+    "ーー": {
+      "english": "What",
+      "category": "character",
+      "added_at": "2026-04-14T23:21:18.106736",
+      "auto_detected": true
+    },
+    "スント": {
+      "english": "Chapter",
+      "category": "character",
+      "added_at": "2026-04-14T23:21:18.106755",
+      "auto_detected": true
+    },
+    "オレ": {
+      "english": "Tama",
+      "category": "character",
+      "added_at": "2026-04-14T23:33:21.618385",
+      "auto_detected": true
+    },
+    "マスター": {
+      "english": "Master",
+      "category": "character",
+      "added_at": "2026-04-14T23:33:33.358221",
+      "auto_detected": true
+    },
+    "ポチ": {
+      "english": "Pochie",
+      "category": "character",
+      "added_at": "2026-04-14T23:33:33.358233",
+      "auto_detected": true
+    }
+  },
+  "chapter_summaries": {},
+  "recent_translations": [
+    {
+      "japanese": "それからタマはオレと一緒に来てくれ",
+      "english": "And as for Tama, please come with me.",
+      "chapter": 1,
+      "page": 4
+    },
+    {
+      "japanese": "マスター同行許可を",
+      "english": "May I accompany Master?",
+      "chapter": 1,
+      "page": 5
+    },
+    {
+      "japanese": "一人だと不安だな〜",
+      "english": "I feel anxious when I'm alone~",
+      "chapter": 1,
+      "page": 5
+    },
+    {
+      "japanese": "マスターの拠点防衛命令を受託",
+      "english": "Accepting the assignment to defend Master's base.",
+      "chapter": 1,
+      "page": 5
+    },
+    {
+      "japanese": "ポチはいらない子なのです？",
+      "english": "Is Pochie a child who is unnecessary?",
+      "chapter": 1,
+      "page": 5
+    },
+    {
+      "japanese": "強い剣士様や魔法使い様が守ってくれないかな〜？",
+      "english": "I wonder if a strong swordsman or mage could protect me~?",
+      "chapter": 1,
+      "page": 5
+    },
+    {
+      "japanese": "むぅ行く",
+      "english": "Hmph, I'll go.",
+      "chapter": 1,
+      "page": 5
+    },
+    {
+      "japanese": "ーーなんと",
+      "english": "What!",
+      "chapter": 5,
+      "page": 1
+    },
+    {
+      "japanese": "オレ達は旧知の騎士と再会していた。",
+      "english": "We ran into a knight we knew from the past.",
+      "chapter": 5,
+      "page": 1
+    },
+    {
+      "japanese": "そ、そんな心から、〈人〉",
+      "english": "S-such genuine feelings... <Person>.",
+      "chapter": 5,
+      "page": 1
+    },
+    {
+      "japanese": "世界狂想曲",
+      "english": "World Rhapsody",
+      "chapter": 5,
+      "page": 1
+    },
+    {
+      "japanese": "第７７話に盗賊のスント",
+      "english": "In Chapter 77, the thief Sunto.",
+      "chapter": 5,
+      "page": 1
+    },
+    {
+      "japanese": "「アイハハハはははやめていいのではなーーー",
+      "english": "\"I, ahahaha, haha, maybe we should stop now~\"",
+      "chapter": 5,
+      "page": 1
+    },
+    {
+      "japanese": "感謝する",
+      "english": "I am grateful.",
+      "chapter": 5,
+      "page": 2
+    },
+    {
+      "japanese": "ではこの馬をお使いください",
+      "english": "Please use this horse.",
+      "chapter": 5,
+      "page": 2
+    },
+    {
+      "japanese": "．．．いや、そんなに",
+      "english": "...No, not that much.",
+      "chapter": 5,
+      "page": 2
+    },
+    {
+      "japanese": "どうやら別人のようだ",
+      "english": "They seem like a different person.",
+      "chapter": 5,
+      "page": 2
+    },
+    {
+      "japanese": "この盗賊はどうするの？",
+      "english": "What are we going to do about these thieves?",
+      "chapter": 5,
+      "page": 3
+    },
+    {
+      "japanese": "ねぇご主人様．．．",
+      "english": "Hey, Master...",
+      "chapter": 5,
+      "page": 3
+    },
+    {
+      "japanese": "か後始末は彼らに任せよう",
+      "english": "Let them deal with the clean-up.",
+      "chapter": 5,
+      "page": 3
+    },
+    {
+      "japanese": "この盗賊達は神殿騎士を追いかけてきた連中だ",
+      "english": "These thieves are the ones who were chasing the temple knights.",
+      "chapter": 5,
+      "page": 3
+    },
+    {
+      "japanese": "何人か連れて行こう",
+      "english": "Let's take some people.",
+      "chapter": 5,
+      "page": 4
+    },
+    {
+      "japanese": "そういえば、アリサとリザ",
+      "english": "Come to think of it, Alisa and Lisa.",
+      "chapter": 5,
+      "page": 4
+    },
+    {
+      "japanese": "それからタマはオレと一緒に来てくれ",
+      "english": "And Tama, come with me.",
+      "chapter": 5,
+      "page": 4
+    },
+    {
+      "japanese": "マスター同行許可を",
+      "english": "Master, may I accompany you?",
+      "chapter": 5,
+      "page": 5
+    },
+    {
+      "japanese": "一人だと不安だな〜",
+      "english": "I feel uneasy if I'm alone~",
+      "chapter": 5,
+      "page": 5
+    },
+    {
+      "japanese": "マスターの拠点防衛命令を受託",
+      "english": "Accepting the order to defend Master's base.",
+      "chapter": 5,
+      "page": 5
+    },
+    {
+      "japanese": "ポチはいらない子なのです？",
+      "english": "Is Pochie a child who isn't needed?",
+      "chapter": 5,
+      "page": 5
+    },
+    {
+      "japanese": "強い剣士様や魔法使い様が守ってくれないかな〜？",
+      "english": "Wouldn't a strong swordsman or mage protect me~?",
+      "chapter": 5,
+      "page": 5
+    },
+    {
+      "japanese": "むぅ行く",
+      "english": "Muu, but I'm going.",
+      "chapter": 5,
+      "page": 5
+    }
+  ],
+  "character_names": {},
+  "settings": {
+    "max_recent_lines": 30,
+    "max_summary_length": 200,
+    "translation_style": "natural",
+    "preserve_honorifics": true
+  }
+}

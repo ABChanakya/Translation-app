@@ -1,0 +1,52 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Bangers&family=Kalam:wght@300;400;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-surface-container-lowest text-on-surface antialiased;
+    margin: 0;
+    min-height: 100vh;
+    font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  }
+
+  #root {
+    min-height: 100vh;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply backdrop-blur-[20px];
+    background: rgba(58, 57, 57, 0.6);
+  }
+
+  .gradient-cta {
+    background: linear-gradient(135deg, #adc6ff 0%, #4d8eff 100%);
+  }
+
+  .manga-shadow {
+    box-shadow: 0px 24px 48px rgba(0, 0, 0, 0.5), 0px 0px 1px rgba(173, 198, 255, 0.1);
+  }
+
+  .active-glow {
+    box-shadow: 0 0 4px 0 rgba(173, 198, 255, 0.6);
+  }
+}
+
+.writing-vertical-rl {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+
+:focus-visible {
+  outline: 2px solid #adc6ff;
+  outline-offset: 2px;
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #0e0e0e; }
+::-webkit-scrollbar-thumb { background: #424754; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #555; }

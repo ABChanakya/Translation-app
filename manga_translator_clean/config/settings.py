@@ -89,8 +89,8 @@ AZURE_ENDPOINT = os.getenv("AZURE_ENDPOINT", "")
 MARIAN_MODEL_PREFIX = "Helsinki-NLP/opus-mt"
 NLLB_MODEL_ID = "facebook/nllb-200-distilled-600M"
 
-# Gemma3 settings (via Ollama)
-GEMMA_MODEL = "gemma3:12b"  # Using the 12B model for better quality
+# Gemma4 settings (via Ollama)
+GEMMA_MODEL = "gemma4:latest"
 GEMMA_KEEP_ALIVE = "1h"
 
 # TranslateGemma settings (translation-optimized Gemma 3 fine-tune via Ollama)

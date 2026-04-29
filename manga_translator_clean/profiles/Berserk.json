@@ -1,0 +1,61 @@
+{
+  "series_name": "Berserk",
+  "created_at": "2026-04-03T13:38:55.985155",
+  "glossary": {
+    "ガッツ": {
+      "english": "Guts",
+      "category": "character",
+      "added_at": "2026-04-03T13:38:56.010859"
+    },
+    "グリフィス": {
+      "english": "Griffith",
+      "category": "character",
+      "added_at": "2026-04-03T13:38:56.036276"
+    },
+    "キャスカ": {
+      "english": "Casca",
+      "category": "character",
+      "added_at": "2026-04-03T13:38:56.061465"
+    },
+    "鷹の団": {
+      "english": "Band of the Hawk",
+      "category": "place",
+      "added_at": "2026-04-03T13:38:56.086300"
+    },
+    "覇王の卵": {
+      "english": "Egg of the King",
+      "category": "technique",
+      "added_at": "2026-04-03T13:38:56.111358"
+    },
+    "狂戦士の甲冑": {
+      "english": "Berserker Armor",
+      "category": "technique",
+      "added_at": "2026-04-03T13:38:56.136405"
+    }
+  },
+  "chapter_summaries": {},
+  "recent_translations": [],
+  "character_names": {
+    "ガッツ": {
+      "english": "Guts",
+      "pronouns": "he/him",
+      "role": "The Black Swordsman"
+    },
+    "グリフィス": {
+      "english": "Griffith",
+      "pronouns": "he/him",
+      "role": "leader of the Band of the Hawk"
+    },
+    "キャスカ": {
+      "english": "Casca",
+      "pronouns": "she/her",
+      "role": "warrior, Guts' companion"
+    }
+  },
+  "settings": {
+    "max_recent_lines": 30,
+    "max_summary_length": 200,
+    "translation_style": "natural",
+    "preserve_honorifics": true
+  }
+}

@@ -1,0 +1,3 @@
+{"bubble_idx": 0, "bbox": [225, 257, 272, 350], "ocr_text": "俺達を！", "confidence": 0.75, "flagged": false}
+{"bubble_idx": 1, "bbox": [1179, 632, 1213, 720], "ocr_text": "．．．たまぎならば", "confidence": 0.6666666666666666, "flagged": false}
+{"bubble_idx": 2, "bbox": [607, 816, 642, 875], "ocr_text": "まあ．．．", "confidence": 0.4, "flagged": true}

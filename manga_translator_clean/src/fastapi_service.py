@@ -30,23 +30,63 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
 from fastapi import FastAPI, File, Form, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from PIL import Image
 
 app = FastAPI(
     title="Manga Translator API",
-    version="1.0",
+    version="2.0",
     description=(
-        "Async REST API for the manga translation pipeline. "
-        "Tier 1 uses manga-ocr + LLM + LaMa. "
-        "Tier 2 uses YOLO + Gemma 3 vision (combined OCR+translate) + LaMa."
+        "Human-assisted manga translation tool. "
+        "AI handles detection, OCR, and draft translations. "
+        "Humans review, correct, and export."
     ),
 )
+
+# CORS — allow the React dev server during development
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Mount review-tool API routers
+from src.api.projects import router as projects_router
+from src.api.chapters import router as chapters_router
+from src.api.bubbles import router as bubbles_router
+from src.api.images import router as images_router
+
+app.include_router(projects_router)
+app.include_router(chapters_router)
+app.include_router(bubbles_router)
+app.include_router(images_router)
 
 # One GPU inference at a time — prevents VRAM contention when multiple
 # requests arrive simultaneously (Ollama queues internally but the image
 # encoding step still allocates GPU memory on the caller side).
 _gpu_sem = asyncio.Semaphore(1)
+
+# ── Serve built React frontend ───────────────────────────────────────────────
+# The Vite build output lives in frontend/dist/. Mount static assets first,
+# then add a catch-all that serves index.html for client-side routing.
+_FRONTEND_DIST = _PROJECT_ROOT / "frontend" / "dist"
+if _FRONTEND_DIST.is_dir():
+    # Serve JS/CSS/images at /assets/...
+    app.mount("/assets", StaticFiles(directory=str(_FRONTEND_DIST / "assets")), name="frontend-assets")
+
+    from fastapi.responses import FileResponse
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        """Catch-all: serve index.html for any non-API route (SPA client routing)."""
+        file_path = _FRONTEND_DIST / full_path
+        if full_path and file_path.is_file():
+            return FileResponse(str(file_path))
+        return FileResponse(str(_FRONTEND_DIST / "index.html"))
 
 
 # ── sync pipeline runners (called in executor to avoid blocking the loop) ─────
